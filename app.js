@@ -764,6 +764,19 @@ class MockTestApp {
             });
         }
 
+        // Question Bank Search and Filtering
+        this.setupElementListener('searchQuestions', 'input', (e) => {
+            this.filterQuestions();
+        });
+
+        this.setupElementListener('subjectFilter', 'change', (e) => {
+            this.filterQuestions();
+        });
+
+        this.setupElementListener('difficultyFilter', 'change', (e) => {
+            this.filterQuestions();
+        });
+
         // Keyboard support
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
@@ -3334,23 +3347,74 @@ D) 6</pre>
     }
 
     // Question Bank Management
+    // Question Bank Filtering and Search
+    filterQuestions() {
+        const searchText = document.getElementById('searchQuestions')?.value.toLowerCase() || '';
+        const subjectFilter = document.getElementById('subjectFilter')?.value || '';
+        const difficultyFilter = document.getElementById('difficultyFilter')?.value || '';
+
+        let filteredQuestions = this.questions.filter(question => {
+            const validatedQuestion = this.validateQuestionData(question);
+            
+            // Text search across question text, options, explanation, subject, and chapter
+            const searchMatch = !searchText || 
+                validatedQuestion.text.toLowerCase().includes(searchText) ||
+                validatedQuestion.options.some(option => option.toLowerCase().includes(searchText)) ||
+                validatedQuestion.explanation.toLowerCase().includes(searchText) ||
+                validatedQuestion.subject.toLowerCase().includes(searchText) ||
+                validatedQuestion.chapter.toLowerCase().includes(searchText);
+
+            // Subject filter
+            const subjectMatch = !subjectFilter || validatedQuestion.subject === subjectFilter;
+
+            // Difficulty filter
+            const difficultyMatch = !difficultyFilter || validatedQuestion.difficulty === difficultyFilter;
+
+            return searchMatch && subjectMatch && difficultyMatch;
+        });
+
+        this.renderQuestionBankWithFilter(filteredQuestions);
+    }
+
     renderQuestionBank() {
+        // Reset filters and show all questions
+        const searchInput = document.getElementById('searchQuestions');
+        const subjectSelect = document.getElementById('subjectFilter');
+        const difficultySelect = document.getElementById('difficultyFilter');
+        
+        if (searchInput) searchInput.value = '';
+        if (subjectSelect) subjectSelect.value = '';
+        if (difficultySelect) difficultySelect.value = '';
+        
+        this.renderQuestionBankWithFilter(this.questions);
+    }
+
+    renderQuestionBankWithFilter(questions) {
         const tbody = document.getElementById('questionsTableBody');
         if (!tbody) return;
         
         tbody.innerHTML = '';
 
-        if (this.questions.length === 0) {
+        if (questions.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="7" class="no-questions">
                         <div class="no-content">
-                            <h3>No Questions Available</h3>
-                            <p>Start by adding questions manually or uploading PDF question banks.</p>
-                            <div class="no-content-actions">
-                                <button class="btn btn--primary" onclick="app.showAddQuestionModal()">➕ Add Question</button>
-                                <button class="btn btn--secondary" onclick="app.showModal('pdfUploadModal')">📤 Upload PDF</button>
-                            </div>
+                            <h3>${this.questions.length === 0 ? 'No Questions Available' : 'No Questions Match Filters'}</h3>
+                            <p>${this.questions.length === 0 ? 
+                                'Start by adding questions manually or uploading PDF question banks.' : 
+                                'Try adjusting your search terms or filters to find more questions.'
+                            }</p>
+                            ${this.questions.length === 0 ? `
+                                <div class="no-content-actions">
+                                    <button class="btn btn--primary" onclick="app.showAddQuestionModal()">➕ Add Question</button>
+                                    <button class="btn btn--secondary" onclick="app.showModal('pdfUploadModal')">📤 Upload PDF</button>
+                                </div>
+                            ` : `
+                                <div class="no-content-actions">
+                                    <button class="btn btn--secondary" onclick="app.renderQuestionBank()">🔄 Clear Filters</button>
+                                </div>
+                            `}
                         </div>
                     </td>
                 </tr>
@@ -3358,7 +3422,7 @@ D) 6</pre>
             return;
         }
 
-        this.questions.forEach((question, index) => {
+        questions.forEach((question, index) => {
             // Validate question data before rendering
             const validatedQuestion = this.validateQuestionData(question);
             
@@ -3398,6 +3462,34 @@ D) 6</pre>
             `;
             tbody.appendChild(row);
         });
+
+        // Update filter status display
+        this.updateFilterStatus(questions.length, this.questions.length);
+    }
+
+    updateFilterStatus(filteredCount, totalCount) {
+        // Find or create filter status element
+        let statusElement = document.querySelector('.filter-status');
+        if (!statusElement) {
+            // Create status element if it doesn't exist
+            const filtersDiv = document.querySelector('.filters');
+            if (filtersDiv) {
+                statusElement = document.createElement('div');
+                statusElement.className = 'filter-status';
+                filtersDiv.appendChild(statusElement);
+            }
+        }
+
+        if (statusElement) {
+            if (filteredCount === totalCount) {
+                statusElement.innerHTML = `<span class="status-text">Showing all ${totalCount} questions</span>`;
+            } else {
+                statusElement.innerHTML = `
+                    <span class="status-text">Showing ${filteredCount} of ${totalCount} questions</span>
+                    <button class="btn btn--sm btn--outline" onclick="app.renderQuestionBank()">Clear filters</button>
+                `;
+            }
+        }
     }
 
     // User Management Methods
