@@ -24,6 +24,9 @@ class MockTestApp {
         // Initialize syllabus mapping for intelligent chapter detection
         this.initializeSyllabusMapping();
         
+        // Initialize exam patterns for intelligent test generation
+        this.initializeExamPatterns();
+        
         // Initialize the application
         this.initializeApp();
     }
@@ -297,6 +300,55 @@ class MockTestApp {
                 "sin", "cos", "tan", "log", "ln", "∑", "∏", "∫", "∂", "≤", "≥", "≠", "≈", "∝"
             ]
         };
+    }
+
+    // Initialize CBT exam pattern framework for intelligent test generation
+    initializeExamPatterns() {
+        this.examPatterns = {
+            'CBT_Technician_GrI_Signal': {
+                name: 'RRB Technician Grade-I Signal CBT',
+                totalQuestions: 100,
+                timeLimit: 90, // minutes
+                subjects: {
+                    'General Awareness': { questions: 10, weight: 0.10 },
+                    'General Intelligence & Reasoning': { questions: 15, weight: 0.15 },
+                    'Basics of Computers and Applications': { questions: 20, weight: 0.20 },
+                    'Mathematics': { questions: 20, weight: 0.20 },
+                    'Basic Science & Engineering': { questions: 35, weight: 0.35 }
+                },
+                difficultyDistribution: {
+                    'Easy': 0.40,    // 40% easy questions
+                    'Medium': 0.45,  // 45% medium questions
+                    'Hard': 0.15     // 15% hard questions
+                },
+                negativeMark: 0.33, // 1/3 negative marking
+                passingPercentage: 40
+            },
+            'SubjectWise_Standard': {
+                name: 'Subject-wise Practice Test',
+                totalQuestions: 25,
+                timeLimit: 22.5, // 54 seconds per question
+                difficultyDistribution: {
+                    'Easy': 0.40,
+                    'Medium': 0.45,
+                    'Hard': 0.15
+                },
+                requireAllChapters: true // Ensure all chapters are covered
+            },
+            'ChapterWise_Standard': {
+                name: 'Chapter-wise Practice Test',
+                totalQuestions: 20,
+                timeLimit: 18, // 54 seconds per question
+                difficultyDistribution: {
+                    'Easy': 0.40,
+                    'Medium': 0.45,
+                    'Hard': 0.15
+                },
+                useDifficultyMix: true
+            }
+        };
+        
+        console.log('Exam patterns initialized:', Object.keys(this.examPatterns));
     }
 
     initializeApp() {
@@ -1200,6 +1252,10 @@ class MockTestApp {
             console.log(`Extracting questions for Practice Set ${setMatch.setNumber}...`);
             const questions = this.extractRRBQuestionsFromSection(setContent, setMatch.setNumber);
             
+            // Enhanced detection for structured format with answer keys and solutions
+            const hasAnswerKey = this.detectAnswerKeySection(setContent);
+            const hasSolutions = this.detectSolutionsSection(setContent);
+            
             if (questions.length >= 30) { // Accept sets with substantial questions
                 // Generate solutions for extracted questions
                 const questionsWithSolutions = questions.map(q => ({
@@ -1230,10 +1286,13 @@ class MockTestApp {
                     passingMarks: Math.ceil(questionsWithSolutions.length * 0.4), // 40% passing
                     questionsWithSolutions: questionsWithSolutions.filter(q => q.hasDetailedSolution).length,
                     estimatedTime: 90,
+                    hasAnswerKey: hasAnswerKey,
+                    hasSolutions: hasSolutions,
+                    isStructuredFormat: hasAnswerKey && hasSolutions,
                     instructions: [
                         '90 minutes for 100 questions',
                         'Each question carries 1 mark',
-                        'No negative marking',
+                        'Negative marking: 1/3 mark deducted for wrong answers',
                         '40% marks required to qualify'
                     ]
                 };
@@ -1313,6 +1372,35 @@ class MockTestApp {
         
         console.log(`Extracted ${questions.length} questions from RRB Practice Set ${setNumber}`);
         return questions;
+    }
+
+    // Detect answer key section in practice set content
+    detectAnswerKeySection(content) {
+        const answerKeyPatterns = [
+            /answer\s+key/gi,
+            /answers\s*:/gi,
+            /correct\s+answers/gi,
+            /solution\s+key/gi,
+            /answer\s+sheet/gi,
+            /\b(1[.\s]*[A-D]|1\s*[A-D])\s*(2[.\s]*[A-D]|2\s*[A-D])\s*(3[.\s]*[A-D]|3\s*[A-D])/gi
+        ];
+        
+        return answerKeyPatterns.some(pattern => pattern.test(content));
+    }
+
+    // Detect solutions section in practice set content  
+    detectSolutionsSection(content) {
+        const solutionsPatterns = [
+            /detailed\s+solutions?/gi,
+            /explanations?/gi,
+            /step\s+by\s+step\s+solutions?/gi,
+            /solved\s+solutions?/gi,
+            /hints?\s+and\s+solutions?/gi,
+            /solution[:\s]*1\./gi,
+            /explanation[:\s]*1\./gi
+        ];
+        
+        return solutionsPatterns.some(pattern => pattern.test(content));
     }
 
     // Validate RRB-specific question format
@@ -1759,38 +1847,76 @@ class MockTestApp {
             this.updateProcessingStep('Validating extracted questions...');
             console.log('PDF metadata before validation:', this.currentPDFMetadata);
             
-        // Enhanced processing with batch support for large datasets  
-        if (extractedQuestions.length > 500) {
-            this.updateProcessingStep(`🔄 Processing large dataset: ${extractedQuestions.length} questions found. Implementing optimizations...`);
+            // CRITICAL FIX: Declare validQuestions variable
+            let validQuestions;
             
-            // Process in batches for better performance
-            const batchSize = 100;
-            let processedQuestions = [];
-            
-            for (let i = 0; i < extractedQuestions.length; i += batchSize) {
-                const batch = extractedQuestions.slice(i, i + batchSize);
-                const batchNumber = Math.floor(i / batchSize) + 1;
-                const totalBatches = Math.ceil(extractedQuestions.length / batchSize);
+            // Enhanced processing with optimized chunking for very large datasets (1500+ questions)
+            if (extractedQuestions.length > 1000) {
+                this.updateProcessingStep(`🚀 Large dataset detected: ${extractedQuestions.length} questions. Applying advanced optimizations...`);
                 
-                this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
+                // Smaller batch size for very large datasets to prevent memory issues
+                const batchSize = 50;
+                let processedQuestions = [];
                 
-                // Add small delay to prevent UI blocking
-                await new Promise(resolve => setTimeout(resolve, 50));
+                for (let i = 0; i < extractedQuestions.length; i += batchSize) {
+                    const batch = extractedQuestions.slice(i, i + batchSize);
+                    const batchNumber = Math.floor(i / batchSize) + 1;
+                    const totalBatches = Math.ceil(extractedQuestions.length / batchSize);
+                    
+                    this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
+                    
+                    // Longer delay for very large datasets to allow UI updates
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    const validatedBatch = this.validateAndFilterQuestions(batch);
+                    processedQuestions.push(...validatedBatch);
+                    
+                    // Update progress with memory usage info
+                    const progress = Math.round((i + batch.length) / extractedQuestions.length * 100);
+                    this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions, batch ${batchNumber}/${totalBatches})`);
+                    
+                    // Memory management for very large datasets
+                    if (batchNumber % 10 === 0) {
+                        // Trigger garbage collection hint every 10 batches
+                        if (window.gc) window.gc();
+                        this.updateProcessingStep(`🧹 Memory optimization applied...`);
+                    }
+                }
                 
-                const validatedBatch = this.validateAndFilterQuestions(batch);
-                processedQuestions.push(...validatedBatch);
+                validQuestions = processedQuestions;
+                this.updateProcessingStep(`✅ Large dataset processing complete: ${validQuestions.length} valid questions extracted`);
                 
-                // Update progress
-                const progress = Math.round((i + batch.length) / extractedQuestions.length * 100);
-                this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions processed)`);
+            } else if (extractedQuestions.length > 500) {
+                this.updateProcessingStep(`🔄 Processing medium dataset: ${extractedQuestions.length} questions found. Implementing optimizations...`);
+                
+                // Process in batches for better performance
+                const batchSize = 100;
+                let processedQuestions = [];
+                
+                for (let i = 0; i < extractedQuestions.length; i += batchSize) {
+                    const batch = extractedQuestions.slice(i, i + batchSize);
+                    const batchNumber = Math.floor(i / batchSize) + 1;
+                    const totalBatches = Math.ceil(extractedQuestions.length / batchSize);
+                    
+                    this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
+                    
+                    // Add small delay to prevent UI blocking
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    
+                    const validatedBatch = this.validateAndFilterQuestions(batch);
+                    processedQuestions.push(...validatedBatch);
+                    
+                    // Update progress
+                    const progress = Math.round((i + batch.length) / extractedQuestions.length * 100);
+                    this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions processed)`);
+                }
+                
+                validQuestions = processedQuestions;
+                this.updateProcessingStep(`✅ Medium dataset processing complete: ${validQuestions.length} valid questions`);
+            } else {
+                // Filter and validate questions normally for smaller datasets
+                validQuestions = this.validateAndFilterQuestions(extractedQuestions);
             }
-            
-            validQuestions = processedQuestions;
-            this.updateProcessingStep(`✅ Large dataset processing complete: ${validQuestions.length} valid questions`);
-        } else {
-            // Filter and validate questions normally for smaller datasets
-            validQuestions = this.validateAndFilterQuestions(extractedQuestions);
-        }
             
             // AI Chapter Detection
             if (isAutoDetectEnabled && validQuestions.length > 0 && this.currentPDFMetadata.subject !== 'Mixed/Practice Books') {
@@ -4678,6 +4804,188 @@ D) 6</pre>
         
         return result;
     }
+
+    // =============== INTELLIGENT TEST GENERATION METHODS ===============
+    
+    // Generate Full Mock Test with exact CBT pattern
+    generateFullMockTest() {
+        const pattern = this.examPatterns['CBT_Technician_GrI_Signal'];
+        const available = this.getQuestionCountBySubject();
+        
+        console.log('Generating Full Mock Test with CBT pattern:', pattern);
+        console.log('Available questions by subject:', available);
+        
+        // Validate requirements
+        const validation = this.validateExamPatternRequirements(pattern, available);
+        if (!validation.valid) {
+            throw new Error(`Cannot create Full Mock Test: ${validation.message}`);
+        }
+        
+        // Generate exact CBT pattern
+        const testConfig = {
+            type: 'fullMock',
+            title: pattern.name,
+            duration: pattern.timeLimit,
+            subjects: Object.fromEntries(
+                Object.entries(pattern.subjects).map(([subject, config]) => 
+                    [subject, config.questions]
+                )
+            ),
+            difficultyDistribution: pattern.difficultyDistribution,
+            isExamPattern: true,
+            negativeMark: pattern.negativeMark,
+            passingPercentage: pattern.passingPercentage,
+            examType: 'CBT_MOCK'
+        };
+        
+        console.log('Full Mock Test config generated:', testConfig);
+        return testConfig;
+    }
+
+    // Generate Subject-wise Test with complete chapter coverage
+    generateSubjectWiseTest(subject) {
+        console.log(`Generating Subject-wise test for: ${subject}`);
+        
+        // Ensure ALL chapters are covered
+        const coverage = this.analyzeChapterCoverage(subject);
+        const distribution = this.calculateBalancedChapterDistribution(coverage, 25);
+        
+        const testConfig = {
+            type: 'subjectWise',
+            title: `${subject} - Complete Coverage`,
+            duration: this.examPatterns['SubjectWise_Standard'].timeLimit,
+            subjects: { [subject]: 25 },
+            chapterDistribution: distribution,
+            requireAllChapters: true,
+            difficultyDistribution: this.examPatterns['SubjectWise_Standard'].difficultyDistribution,
+            examType: 'SUBJECT_PRACTICE'
+        };
+        
+        console.log('Subject-wise test config:', testConfig);
+        return testConfig;
+    }
+
+    // Generate Chapter-wise Test with difficulty mixing
+    generateChapterWiseTest(subject, chapter) {
+        console.log(`Generating Chapter-wise test for: ${subject} - ${chapter}`);
+        
+        const testConfig = {
+            type: 'chapterWise',
+            title: `${chapter} - Difficulty Mixed`,
+            duration: this.examPatterns['ChapterWise_Standard'].timeLimit,
+            subjects: { [subject]: 20 },
+            chapter: chapter,
+            difficultyDistribution: this.examPatterns['ChapterWise_Standard'].difficultyDistribution,
+            useDifficultyMix: true,
+            examType: 'CHAPTER_PRACTICE'
+        };
+        
+        console.log('Chapter-wise test config:', testConfig);
+        return testConfig;
+    }
+
+    // Validate exam pattern requirements
+    validateExamPatternRequirements(pattern, available) {
+        const result = { valid: true, message: '', details: {} };
+        const missing = [];
+        
+        Object.entries(pattern.subjects).forEach(([subject, config]) => {
+            const standardizedSubject = this.getStandardizedSubjectName(subject);
+            const availableCount = available[standardizedSubject] || 0;
+            const requiredCount = config.questions;
+            
+            result.details[subject] = {
+                required: requiredCount,
+                available: availableCount,
+                sufficient: availableCount >= requiredCount
+            };
+            
+            if (availableCount < requiredCount) {
+                missing.push(`${subject}: need ${requiredCount}, have ${availableCount}`);
+            }
+        });
+        
+        if (missing.length > 0) {
+            result.valid = false;
+            result.message = `Insufficient questions for Full Mock Test:\n${missing.join('\n')}`;
+        }
+        
+        return result;
+    }
+
+    // Analyze chapter coverage for a subject
+    analyzeChapterCoverage(subject) {
+        const standardizedSubject = this.getStandardizedSubjectName(subject);
+        const subjectQuestions = this.questions.filter(q => 
+            this.getStandardizedSubjectName(q.subject) === standardizedSubject
+        );
+        
+        const chapterStats = {};
+        subjectQuestions.forEach(q => {
+            const chapter = q.chapter || 'General';
+            if (!chapterStats[chapter]) {
+                chapterStats[chapter] = {
+                    total: 0,
+                    easy: 0,
+                    medium: 0,
+                    hard: 0
+                };
+            }
+            chapterStats[chapter].total++;
+            chapterStats[chapter][q.difficulty?.toLowerCase() || 'medium']++;
+        });
+        
+        return {
+            totalQuestions: subjectQuestions.length,
+            totalChapters: Object.keys(chapterStats).length,
+            chapterStats: chapterStats,
+            hasCompletecoverage: Object.keys(chapterStats).length >= 3 // Minimum 3 chapters
+        };
+    }
+
+    // Calculate balanced chapter distribution
+    calculateBalancedChapterDistribution(coverage, totalQuestions) {
+        const chapters = Object.keys(coverage.chapterStats);
+        const distribution = {};
+        
+        if (chapters.length === 0) {
+            return distribution;
+        }
+        
+        // Distribute questions proportionally based on available questions
+        const totalAvailable = coverage.totalQuestions;
+        chapters.forEach(chapter => {
+            const chapterQuestions = coverage.chapterStats[chapter].total;
+            const proportion = chapterQuestions / totalAvailable;
+            distribution[chapter] = Math.max(1, Math.round(totalQuestions * proportion));
+        });
+        
+        // Adjust to ensure total equals target
+        const currentTotal = Object.values(distribution).reduce((sum, count) => sum + count, 0);
+        if (currentTotal !== totalQuestions) {
+            const largest = Object.keys(distribution).reduce((a, b) => 
+                distribution[a] > distribution[b] ? a : b
+            );
+            distribution[largest] += (totalQuestions - currentTotal);
+        }
+        
+        return distribution;
+    }
+
+    // Get question count by subject with standardized names
+    getQuestionCountBySubject(questions = null) {
+        const questionSet = questions || this.questions;
+        const counts = {};
+        
+        questionSet.forEach(q => {
+            const standardizedSubject = this.getStandardizedSubjectName(q.subject);
+            counts[standardizedSubject] = (counts[standardizedSubject] || 0) + 1;
+        });
+        
+        return counts;
+    }
+
+    // =============== END INTELLIGENT TEST GENERATION ===============
 
     initializeTestInterface() {
         const testTitleEl = document.getElementById('testTitle');
