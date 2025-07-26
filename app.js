@@ -1,4 +1,4 @@
-// RRB Technician Grade-3 Signal Mock Test Application with PDF Processing
+// RRB Technician Grade-3 Signal Mock Test Application with Enhanced PDF Processing
 
 class MockTestApp {
     constructor() {
@@ -13,6 +13,10 @@ class MockTestApp {
         this.currentPDF = null;
         this.pdfDoc = null;
         this.currentPage = 1;
+        this.tempExtractedQuestions = null;
+        this.currentExtractedQuestions = null;
+        this.currentReviewIndex = 0;
+        this.currentPDFFile = null;
         
         // Wait for DOM to be ready before initializing
         if (document.readyState === 'loading') {
@@ -222,7 +226,7 @@ class MockTestApp {
 
         this.setupElementListener('uploadQuestionsBtn', 'click', (e) => {
             e.preventDefault();
-            this.showModal('uploadModal');
+            this.showModal('pdfUploadModal');
         });
 
         this.setupElementListener('saveQuestion', 'click', (e) => {
@@ -473,6 +477,9 @@ class MockTestApp {
                 <div class="processing-indicator">
                     <div class="spinner"></div>
                     <p>Processing PDF and extracting questions...</p>
+                    <div class="progress-details">
+                        <p id="processingStep">Extracting text from PDF...</p>
+                    </div>
                 </div>
             `;
             processingDiv.style.display = 'block';
@@ -482,20 +489,52 @@ class MockTestApp {
             const fileArrayBuffer = await this.currentPDFFile.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(fileArrayBuffer).promise;
             
+            this.updateProcessingStep('Extracting text from pages...');
+            
             let fullText = '';
+            let pageTexts = [];
+            
+            // Extract text page by page for better processing
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
-                fullText += pageText + '\n';
+                
+                // Get text with position information for better parsing
+                const pageItems = textContent.items.map(item => ({
+                    text: item.str,
+                    x: item.transform[4],
+                    y: item.transform[5],
+                    width: item.width,
+                    height: item.height
+                }));
+                
+                const pageText = this.reconstructPageText(pageItems);
+                pageTexts.push(pageText);
+                fullText += pageText + '\n\n--- PAGE_BREAK ---\n\n';
+                
+                this.updateProcessingStep(`Processing page ${i} of ${pdf.numPages}...`);
             }
 
-            const extractedQuestions = this.extractQuestionsFromText(fullText);
+            this.updateProcessingStep('Analyzing question structure...');
             
-            if (extractedQuestions.length > 0) {
-                this.showExtractedQuestionsPreview(extractedQuestions);
+            // Enhanced text preprocessing
+            const preprocessedText = this.preprocessPDFText(fullText);
+            
+            this.updateProcessingStep('Extracting questions...');
+            
+            // Multiple extraction strategies
+            const extractedQuestions = this.extractQuestionsWithMultipleStrategies(preprocessedText, pageTexts);
+            
+            this.updateProcessingStep('Validating extracted questions...');
+            
+            // Filter and validate questions
+            const validQuestions = this.validateAndFilterQuestions(extractedQuestions);
+            
+            if (validQuestions.length > 0) {
+                this.showExtractedQuestionsPreview(validQuestions);
             } else {
-                alert('No questions found in the PDF. Please check the format or try a different file.');
+                alert('No valid questions found in the PDF. The format might not be supported or the questions need manual formatting.');
+                this.showExtractionTips();
             }
 
             // Store PDF information
@@ -506,7 +545,8 @@ class MockTestApp {
                 subject: document.getElementById('pdfSubject')?.value || 'General',
                 chapter: document.getElementById('pdfChapter')?.value || 'Miscellaneous',
                 uploadDate: new Date().toISOString(),
-                questionsExtracted: extractedQuestions.length,
+                questionsExtracted: validQuestions.length,
+                totalPages: pdf.numPages,
                 data: fileArrayBuffer
             };
 
@@ -523,57 +563,187 @@ class MockTestApp {
         }
     }
 
-    extractQuestionsFromText(text) {
+    updateProcessingStep(step) {
+        const stepElement = document.getElementById('processingStep');
+        if (stepElement) {
+            stepElement.textContent = step;
+        }
+    }
+
+    reconstructPageText(pageItems) {
+        // Sort items by Y position (top to bottom) then X position (left to right)
+        pageItems.sort((a, b) => {
+            const yDiff = Math.abs(a.y - b.y);
+            if (yDiff < 5) { // Same line
+                return a.x - b.x;
+            }
+            return b.y - a.y; // Top to bottom (PDF coordinates are bottom-up)
+        });
+
+        let reconstructedText = '';
+        let currentY = null;
+        
+        pageItems.forEach(item => {
+            if (currentY !== null && Math.abs(item.y - currentY) > 5) {
+                reconstructedText += '\n';
+            }
+            reconstructedText += item.text + ' ';
+            currentY = item.y;
+        });
+
+        return reconstructedText.trim();
+    }
+
+    preprocessPDFText(text) {
+        console.log('Preprocessing text of length:', text.length);
+        
+        let cleanedText = text
+            // Remove page breaks
+            .replace(/--- PAGE_BREAK ---/g, '\n')
+            // Remove extra whitespace but preserve line structure
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n\s*\n/g, '\n')
+            // Remove common PDF artifacts
+            .replace(/\f/g, '')
+            .replace(/\r/g, '')
+            // Remove timestamps and percentages that don't belong to questions
+            .replace(/\d{1,2}\/\d{1,2}\/\d{4}\s*-->\s*\d{1,2}:\d{2}\s*(AM|PM)\s*-\s*\d{1,2}:\d{2}\s*(AM|PM)/g, ' ')
+            .replace(/\d+\.\d+%\s*(Attempted|Right|Wrong)/g, ' ')
+            // Clean up question numbering variations
+            .replace(/([Qq]uestion)\s*[:\-]?\s*(\d+)\s*[:\.\)]\s*/g, 'Q$2. ')
+            .replace(/^(\d+)\s*[\.\)]\s*/gm, 'Q$1. ')
+            // Normalize option formatting
+            .replace(/\b([A-D])\s*[\)\.\]]\s*/g, '$1) ')
+            .replace(/\(([a-d])\)\s*/g, (match, letter) => `${letter.toUpperCase()}) `)
+            // Clean up multiple spaces
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        console.log('Cleaned text length:', cleanedText.length);
+        return cleanedText;
+    }
+
+    extractQuestionsWithMultipleStrategies(text, pageTexts) {
+        const allQuestions = [];
+        
+        // Strategy 1: Line-by-line parsing
+        const strategy1Questions = this.extractQuestionsLineByLine(text);
+        console.log('Strategy 1 found:', strategy1Questions.length, 'questions');
+        
+        // Strategy 2: Pattern-based extraction
+        const strategy2Questions = this.extractQuestionsWithPatterns(text);
+        console.log('Strategy 2 found:', strategy2Questions.length, 'questions');
+        
+        // Strategy 3: Block-based extraction
+        const strategy3Questions = this.extractQuestionsBlockBased(text);
+        console.log('Strategy 3 found:', strategy3Questions.length, 'questions');
+        
+        // Combine and deduplicate results
+        const combinedQuestions = [
+            ...strategy1Questions,
+            ...strategy2Questions,
+            ...strategy3Questions
+        ];
+        
+        // Remove duplicates based on question text similarity
+        const uniqueQuestions = this.removeDuplicateQuestions(combinedQuestions);
+        console.log('Final unique questions:', uniqueQuestions.length);
+        
+        return uniqueQuestions;
+    }
+
+    extractQuestionsLineByLine(text) {
+        const questions = [];
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        let currentQuestion = null;
+        let optionCount = 0;
+        let questionNumber = 0;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            
+            // Check if this line starts a new question
+            const questionMatch = line.match(/^Q(\d+)\.\s*(.+)/);
+            if (questionMatch) {
+                // Save previous question if complete
+                if (currentQuestion && this.isQuestionComplete(currentQuestion)) {
+                    questions.push(this.finalizeQuestion(currentQuestion));
+                }
+                
+                // Start new question
+                questionNumber = parseInt(questionMatch[1]);
+                currentQuestion = {
+                    number: questionNumber,
+                    text: questionMatch[2].trim(),
+                    options: [],
+                    optionsText: []
+                };
+                optionCount = 0;
+                continue;
+            }
+            
+            // Check if this line is an option
+            if (currentQuestion) {
+                const optionMatch = line.match(/^([A-D])\)\s*(.+)/);
+                if (optionMatch && optionCount < 4) {
+                    const optionLetter = optionMatch[1];
+                    const optionText = optionMatch[2].trim();
+                    
+                    // Verify option sequence
+                    const expectedLetter = String.fromCharCode(65 + optionCount);
+                    if (optionLetter === expectedLetter) {
+                        currentQuestion.options.push(optionText);
+                        optionCount++;
+                    }
+                } else if (!line.match(/^[A-D]\)/)) {
+                    // This might be continuation of question text
+                    if (optionCount === 0 && currentQuestion.text.length < 200) {
+                        currentQuestion.text += ' ' + line;
+                    }
+                }
+            }
+        }
+        
+        // Don't forget the last question
+        if (currentQuestion && this.isQuestionComplete(currentQuestion)) {
+            questions.push(this.finalizeQuestion(currentQuestion));
+        }
+        
+        return questions;
+    }
+
+    extractQuestionsWithPatterns(text) {
         const questions = [];
         
-        // Multiple patterns to detect different question formats
+        // More precise patterns with better boundary detection
         const patterns = [
-            // Pattern 1: Q1. Question text? A) option B) option C) option D) option
-            /Q(\d+)\.?\s*(.+?)\?\s*A\)\s*(.+?)\s*B\)\s*(.+?)\s*C\)\s*(.+?)\s*D\)\s*(.+?)(?=Q\d+|$)/gi,
+            // Q1. Question? A) ... B) ... C) ... D) ...
+            /Q(\d+)\.\s*([^?]+\?)\s*A\)\s*([^B]+)\s*B\)\s*([^C]+)\s*C\)\s*([^D]+)\s*D\)\s*([^Q]+?)(?=\s*Q\d+\.|$)/gi,
             
-            // Pattern 2: 1. Question text? (a) option (b) option (c) option (d) option
-            /(\d+)\.?\s*(.+?)\?\s*\(a\)\s*(.+?)\s*\(b\)\s*(.+?)\s*\(c\)\s*(.+?)\s*\(d\)\s*(.+?)(?=\d+\.|$)/gi,
-            
-            // Pattern 3: Question: text? Options: A. option B. option C. option D. option
-            /Question:\s*(.+?)\?\s*Options:\s*A\.\s*(.+?)\s*B\.\s*(.+?)\s*C\.\s*(.+?)\s*D\.\s*(.+?)(?=Question:|$)/gi
+            // Question with number at start: 1. Question? A) ... B) ... C) ... D) ...
+            /(\d+)\.\s*([^?]+\?)\s*A\)\s*([^B]+)\s*B\)\s*([^C]+)\s*C\)\s*([^D]+)\s*D\)\s*([^1-9]+?)(?=\s*\d+\.|$)/gi
         ];
 
-        patterns.forEach(pattern => {
+        patterns.forEach((pattern, index) => {
             let match;
             while ((match = pattern.exec(text)) !== null) {
-                let questionText, options;
-                
-                if (pattern === patterns[0]) {
-                    // Q1. format
-                    questionText = match[2].trim();
-                    options = [match[3].trim(), match[4].trim(), match[5].trim(), match[6].trim()];
-                } else if (pattern === patterns[1]) {
-                    // 1. format
-                    questionText = match[2].trim();
-                    options = [match[3].trim(), match[4].trim(), match[5].trim(), match[6].trim()];
-                } else {
-                    // Question: format
-                    questionText = match[1].trim();
-                    options = [match[2].trim(), match[3].trim(), match[4].trim(), match[5].trim()];
-                }
+                const questionNumber = parseInt(match[1]);
+                const questionText = match[2].trim();
+                const options = [
+                    match[3].trim(),
+                    match[4].trim(),
+                    match[5].trim(),
+                    match[6].trim()
+                ];
 
-                // Basic validation
-                if (questionText.length > 10 && options.every(opt => opt.length > 0)) {
-                    const question = {
-                        id: 'pdf_q_' + Date.now() + '_' + questions.length,
+                if (this.isValidQuestionData(questionText, options, questionNumber)) {
+                    questions.push({
+                        number: questionNumber,
                         text: questionText,
                         options: options,
-                        correctAnswer: 0, // Default, user will need to verify
-                        explanation: 'Extracted from PDF - please verify and add explanation',
-                        subject: document.getElementById('pdfSubject')?.value || 'General',
-                        chapter: document.getElementById('pdfChapter')?.value || 'PDF Extract',
-                        difficulty: this.guessDifficulty(questionText),
-                        isPYQ: false,
-                        source: `PDF: ${this.currentPDFFile.name}`,
-                        needsReview: true
-                    };
-                    
-                    questions.push(question);
+                        source: `Pattern ${index + 1}`
+                    });
                 }
             }
         });
@@ -581,16 +751,170 @@ class MockTestApp {
         return questions;
     }
 
-    guessDifficulty(questionText) {
-        const text = questionText.toLowerCase();
+    extractQuestionsBlockBased(text) {
+        const questions = [];
         
-        // Simple heuristics for difficulty
-        if (text.includes('calculate') || text.includes('derive') || text.includes('prove') || text.includes('analyze')) {
-            return 'Hard';
-        } else if (text.includes('compare') || text.includes('explain') || text.includes('difference') || text.includes('why')) {
-            return 'Medium';
-        } else {
-            return 'Easy';
+        // Split text into potential question blocks
+        const blocks = text.split(/(?=Q\d+\.)|(?=\d+\.)/);
+        
+        blocks.forEach(block => {
+            block = block.trim();
+            if (block.length < 20) return; // Skip very short blocks
+            
+            // Try to parse this block as a single question
+            const questionMatch = block.match(/^(?:Q)?(\d+)\.\s*(.+?)(?:\s*A\)\s*(.+?)\s*B\)\s*(.+?)\s*C\)\s*(.+?)\s*D\)\s*(.+?))?$/s);
+            
+            if (questionMatch) {
+                const questionNumber = parseInt(questionMatch[1]);
+                let questionText = questionMatch[2];
+                
+                if (questionMatch[3] && questionMatch[4] && questionMatch[5] && questionMatch[6]) {
+                    // Has all options in the match
+                    const options = [
+                        questionMatch[3].trim(),
+                        questionMatch[4].trim(),
+                        questionMatch[5].trim(),
+                        questionMatch[6].trim()
+                    ];
+                    
+                    // Clean question text (remove any option text that leaked in)
+                    questionText = questionText.replace(/\s*[A-D]\).*$/s, '').trim();
+                    
+                    if (this.isValidQuestionData(questionText, options, questionNumber)) {
+                        questions.push({
+                            number: questionNumber,
+                            text: questionText,
+                            options: options,
+                            source: 'Block parsing'
+                        });
+                    }
+                }
+            }
+        });
+        
+        return questions;
+    }
+
+    isQuestionComplete(question) {
+        return question && 
+               question.text && 
+               question.text.length > 10 && 
+               question.options && 
+               question.options.length === 4 &&
+               question.options.every(opt => opt && opt.length > 0);
+    }
+
+    isValidQuestionData(questionText, options, questionNumber) {
+        if (!questionText || questionText.length < 10 || questionText.length > 500) {
+            return false;
+        }
+        
+        if (!options || options.length !== 4) {
+            return false;
+        }
+        
+        // Check all options have content
+        if (!options.every(opt => opt && opt.trim().length > 0)) {
+            return false;
+        }
+        
+        // Check for mixed content indicators
+        const mixedIndicators = [
+            /Q\d+\./,
+            /\d+\.\d+%/,
+            /\d{1,2}\/\d{1,2}\/\d{4}/,
+            /Question\s+\d+/,
+            /(Attempted|Right|Wrong)/
+        ];
+        
+        if (mixedIndicators.some(indicator => indicator.test(questionText))) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    finalizeQuestion(questionData) {
+        return {
+            id: 'pdf_q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            text: questionData.text.trim(),
+            options: questionData.options.map(opt => opt.trim()),
+            correctAnswer: 0, // Default, user will need to verify
+            explanation: 'Extracted from PDF - please verify and add explanation',
+            subject: document.getElementById('pdfSubject')?.value || 'General',
+            chapter: document.getElementById('pdfChapter')?.value || 'PDF Extract',
+            difficulty: this.guessDifficulty(questionData.text),
+            isPYQ: false,
+            source: `PDF: ${this.currentPDFFile.name}`,
+            needsReview: true,
+            questionNumber: questionData.number,
+            extractionSource: questionData.source || 'Unknown'
+        };
+    }
+
+    removeDuplicateQuestions(questions) {
+        const unique = [];
+        const seenTexts = new Set();
+        
+        questions.forEach(question => {
+            const normalizedText = question.text.toLowerCase().replace(/\s+/g, ' ').trim();
+            
+            if (!seenTexts.has(normalizedText)) {
+                seenTexts.add(normalizedText);
+                unique.push(question);
+            }
+        });
+        
+        return unique.sort((a, b) => (a.number || 0) - (b.number || 0));
+    }
+
+    validateAndFilterQuestions(questions) {
+        return questions.filter(question => {
+            // Additional validation checks
+            if (!question.text || question.text.length < 10) {
+                console.warn(`Question ${question.number}: Text too short`);
+                return false;
+            }
+            
+            if (question.text.length > 300) {
+                console.warn(`Question ${question.number}: Text too long, might contain mixed content`);
+                return false;
+            }
+            
+            if (!question.options || question.options.length !== 4) {
+                console.warn(`Question ${question.number}: Invalid options`);
+                return false;
+            }
+            
+            // Check if any option is too long (might indicate mixed content)
+            if (question.options.some(opt => opt.length > 100)) {
+                console.warn(`Question ${question.number}: Option too long`);
+                return false;
+            }
+            
+            return true;
+        });
+    }
+
+    showExtractionTips() {
+        const tipsHtml = `
+            <div class="extraction-tips">
+                <h3>Extraction Tips</h3>
+                <p>To improve question extraction, please ensure your PDF has:</p>
+                <ul>
+                    <li>Clear question numbering (Q1., Q2., etc. or 1., 2., etc.)</li>
+                    <li>Options marked as A), B), C), D)</li>
+                    <li>Questions ending with question marks (?)</li>
+                    <li>Consistent formatting throughout</li>
+                </ul>
+                <p>You can try manually formatting the PDF or add questions manually using the "Add Question" button.</p>
+            </div>
+        `;
+        
+        const previewDiv = document.getElementById('extractedQuestionsPreview');
+        if (previewDiv) {
+            previewDiv.innerHTML = tipsHtml;
+            previewDiv.style.display = 'block';
         }
     }
 
@@ -598,25 +922,64 @@ class MockTestApp {
         const previewHtml = `
             <div class="extracted-questions-preview">
                 <h3>Extracted Questions Preview</h3>
-                <p>Found ${extractedQuestions.length} questions. Please review and confirm:</p>
+                <div class="extraction-summary">
+                    <p>Successfully extracted <strong>${extractedQuestions.length}</strong> questions</p>
+                    <div class="extraction-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Questions:</span>
+                            <span class="stat-value">${extractedQuestions.length}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Subject:</span>
+                            <span class="stat-value">${document.getElementById('pdfSubject')?.value || 'General'}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Need Review:</span>
+                            <span class="stat-value">${extractedQuestions.filter(q => q.needsReview).length}</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="questions-preview-list">
-                    ${extractedQuestions.slice(0, 5).map((q, index) => `
+                    ${extractedQuestions.slice(0, 3).map((q, index) => `
                         <div class="preview-question">
-                            <h4>Question ${index + 1}:</h4>
-                            <p><strong>Q:</strong> ${q.text}</p>
-                            <div class="preview-options">
-                                ${q.options.map((opt, i) => `<p><strong>${String.fromCharCode(65 + i)}:</strong> ${opt}</p>`).join('')}
+                            <div class="question-header">
+                                <h4>Question ${q.questionNumber || index + 1}</h4>
+                                <span class="extraction-method">${q.extractionSource || 'Auto'}</span>
+                            </div>
+                            <div class="question-content">
+                                <p class="question-text"><strong>Q:</strong> ${q.text}</p>
+                                <div class="preview-options">
+                                    ${q.options.map((opt, i) => `
+                                        <p class="option-item">
+                                            <strong>${String.fromCharCode(65 + i)}:</strong> ${opt}
+                                        </p>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div class="question-meta">
+                                <span class="difficulty-badge difficulty-${q.difficulty}">${q.difficulty}</span>
+                                <span class="subject-badge">${q.subject}</span>
+                                ${q.needsReview ? '<span class="review-badge">Needs Review</span>' : ''}
                             </div>
                         </div>
                     `).join('')}
-                    ${extractedQuestions.length > 5 ? `<p>... and ${extractedQuestions.length - 5} more questions</p>` : ''}
+                    ${extractedQuestions.length > 3 ? `
+                        <div class="more-questions">
+                            <p>... and ${extractedQuestions.length - 3} more questions</p>
+                        </div>
+                    ` : ''}
                 </div>
+                
                 <div class="preview-actions">
-                    <button class="btn btn--primary" onclick="app.confirmExtractedQuestions(${JSON.stringify(extractedQuestions).replace(/"/g, '&quot;')})">
+                    <button class="btn btn--primary" onclick="app.confirmExtractedQuestions()">
                         Add All Questions
                     </button>
-                    <button class="btn btn--secondary" onclick="app.reviewExtractedQuestions(${JSON.stringify(extractedQuestions).replace(/"/g, '&quot;')})">
+                    <button class="btn btn--secondary" onclick="app.reviewExtractedQuestions()">
                         Review Individual Questions
+                    </button>
+                    <button class="btn btn--outline" onclick="app.discardExtractedQuestions()">
+                        Discard All
                     </button>
                 </div>
             </div>
@@ -627,23 +990,36 @@ class MockTestApp {
             previewDiv.innerHTML = previewHtml;
             previewDiv.style.display = 'block';
         }
+
+        // Store extracted questions temporarily
+        this.tempExtractedQuestions = extractedQuestions;
     }
 
-    confirmExtractedQuestions(extractedQuestions) {
-        // Add all extracted questions to the question bank
-        this.questions.push(...extractedQuestions);
-        this.saveQuestions();
-        this.hideModal('pdfUploadModal');
-        this.renderQuestionBank();
-        alert(`Successfully added ${extractedQuestions.length} questions from PDF!`);
+    confirmExtractedQuestions() {
+        if (this.tempExtractedQuestions && this.tempExtractedQuestions.length > 0) {
+            this.questions.push(...this.tempExtractedQuestions);
+            this.saveQuestions();
+            this.hideModal('pdfUploadModal');
+            this.renderQuestionBank();
+            alert(`Successfully added ${this.tempExtractedQuestions.length} questions from PDF!`);
+            this.tempExtractedQuestions = null;
+        }
     }
 
-    reviewExtractedQuestions(extractedQuestions) {
-        // Show modal for individual question review
-        this.showModal('questionReviewModal');
-        this.currentExtractedQuestions = extractedQuestions;
-        this.currentReviewIndex = 0;
-        this.showQuestionForReview();
+    reviewExtractedQuestions() {
+        if (this.tempExtractedQuestions && this.tempExtractedQuestions.length > 0) {
+            this.showModal('questionReviewModal');
+            this.currentExtractedQuestions = [...this.tempExtractedQuestions];
+            this.currentReviewIndex = 0;
+            this.showQuestionForReview();
+        }
+    }
+
+    discardExtractedQuestions() {
+        if (confirm('Are you sure you want to discard all extracted questions?')) {
+            this.tempExtractedQuestions = null;
+            this.hideModal('pdfUploadModal');
+        }
     }
 
     showQuestionForReview() {
@@ -737,6 +1113,35 @@ class MockTestApp {
 
     cancelReview() {
         this.hideModal('questionReviewModal');
+    }
+
+    guessDifficulty(questionText) {
+        const text = questionText.toLowerCase();
+        
+        const hardIndicators = [
+            'calculate', 'derive', 'prove', 'analyze', 'evaluate', 'synthesize',
+            'algorithm', 'complex', 'advanced', 'sophisticated', 'implement'
+        ];
+        
+        const mediumIndicators = [
+            'compare', 'explain', 'difference', 'why', 'how', 'relationship',
+            'interpret', 'apply', 'understand', 'determine'
+        ];
+        
+        const easyIndicators = [
+            'what', 'which', 'who', 'when', 'where', 'define', 'list',
+            'identify', 'recall', 'remember', 'name', 'state'
+        ];
+
+        if (hardIndicators.some(indicator => text.includes(indicator))) {
+            return 'Hard';
+        } else if (mediumIndicators.some(indicator => text.includes(indicator))) {
+            return 'Medium';
+        } else if (easyIndicators.some(indicator => text.includes(indicator))) {
+            return 'Easy';
+        } else {
+            return 'Medium'; // Default
+        }
     }
 
     // PDF Viewer Methods
@@ -948,7 +1353,7 @@ class MockTestApp {
         });
     }
 
-    // Continue with the rest of the existing methods...
+    // User Management Methods
     checkExistingUser() {
         console.log('Checking existing user...', this.users.length);
         if (this.users.length > 0) {
@@ -1097,6 +1502,7 @@ class MockTestApp {
         }
     }
 
+    // Navigation Methods
     switchSection(sectionId) {
         console.log('Switching to section:', sectionId);
         
@@ -1150,6 +1556,7 @@ class MockTestApp {
         });
     }
 
+    // Question Management Methods
     showAddQuestionModal() {
         const titleEl = document.getElementById('questionModalTitle');
         const formEl = document.getElementById('questionForm');
@@ -1195,7 +1602,7 @@ class MockTestApp {
         this.showModal('questionModal');
     }
 
-    saveQuestion() {
+        saveQuestion() {
         const form = document.getElementById('questionForm');
         if (!form || !form.checkValidity()) {
             if (form) form.reportValidity();
@@ -1248,7 +1655,7 @@ class MockTestApp {
         }
     }
 
-    // Test Management
+    // Test Management Methods
     handleQuickAction(action) {
         switch(action) {
             case 'fullMockTest':
@@ -1631,7 +2038,7 @@ class MockTestApp {
         
         // Render all questions
         this.renderReviewQuestions('all');
-            }
+    }
 
     filterReviewQuestions(filter) {
         // Update filter buttons
@@ -1701,7 +2108,7 @@ class MockTestApp {
         });
     }
 
-    // Analytics
+    // Analytics Methods
     loadAnalytics() {
         this.renderOverviewCharts();
     }
@@ -1981,7 +2388,7 @@ class MockTestApp {
         return shuffled;
     }
 
-    // Data Persistence
+    // Data Persistence Methods
     saveUsers() {
         try {
             localStorage.setItem('mockTestUsers', JSON.stringify(this.users));
