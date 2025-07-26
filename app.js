@@ -409,11 +409,104 @@ class MockTestApp {
                     isPYQ: false,
                     source: "Manual",
                     needsReview: false
+                },
+                // Additional questions for better testing
+                {
+                    id: "q6",
+                    text: "If the sum of two numbers is 20 and their difference is 6, find the larger number.",
+                    options: ["13", "14", "15", "16"],
+                    correctAnswer: 0,
+                    explanation: "Let the numbers be x and y. x + y = 20, x - y = 6. Solving: x = 13, y = 7",
+                    subject: "Mathematics",
+                    chapter: "Linear Equations",
+                    difficulty: "Medium",
+                    isPYQ: true,
+                    source: "Manual",
+                    needsReview: false
+                },
+                {
+                    id: "q7",
+                    text: "Find the next term in the series: 2, 6, 18, 54, ?",
+                    options: ["162", "108", "126", "144"],
+                    correctAnswer: 0,
+                    explanation: "Each term is multiplied by 3: 2×3=6, 6×3=18, 18×3=54, 54×3=162",
+                    subject: "General Intelligence & Reasoning",
+                    chapter: "Number Series",
+                    difficulty: "Easy",
+                    isPYQ: false,
+                    source: "Manual",
+                    needsReview: false
+                },
+                {
+                    id: "q8",
+                    text: "Which programming language is primarily used for web development?",
+                    options: ["Python", "JavaScript", "C++", "Java"],
+                    correctAnswer: 1,
+                    explanation: "JavaScript is the primary language for client-side web development",
+                    subject: "Computer Applications",
+                    chapter: "Programming Languages",
+                    difficulty: "Easy",
+                    isPYQ: false,
+                    source: "Manual",
+                    needsReview: false
+                },
+                {
+                    id: "q9",
+                    text: "What is the unit of electrical resistance?",
+                    options: ["Volt", "Ampere", "Ohm", "Watt"],
+                    correctAnswer: 2,
+                    explanation: "Ohm (Ω) is the unit of electrical resistance, named after Georg Ohm",
+                    subject: "Basic Science & Engineering",
+                    chapter: "Basic Electricity",
+                    difficulty: "Easy",
+                    isPYQ: true,
+                    source: "Manual",
+                    needsReview: false
+                },
+                {
+                    id: "q10",
+                    text: "Which Indian state has the longest coastline?",
+                    options: ["Tamil Nadu", "Gujarat", "Maharashtra", "Andhra Pradesh"],
+                    correctAnswer: 1,
+                    explanation: "Gujarat has the longest coastline in India, approximately 1,600 km",
+                    subject: "General Awareness",
+                    chapter: "Indian Geography",
+                    difficulty: "Medium",
+                    isPYQ: true,
+                    source: "Manual",
+                    needsReview: false
+                },
+                {
+                    id: "q11",
+                    text: "What is the area of a circle with radius 7 cm? (Use π = 22/7)",
+                    options: ["154 cm²", "144 cm²", "164 cm²", "174 cm²"],
+                    correctAnswer: 0,
+                    explanation: "Area = πr² = (22/7) × 7² = (22/7) × 49 = 154 cm²",
+                    subject: "Mathematics",
+                    chapter: "Geometry",
+                    difficulty: "Easy",
+                    isPYQ: false,
+                    source: "Manual",
+                    needsReview: false
+                },
+                {
+                    id: "q12",
+                    text: "In Excel, which function is used to find the maximum value in a range?",
+                    options: ["MAX()", "MAXIMUM()", "LARGE()", "HIGH()"],
+                    correctAnswer: 0,
+                    explanation: "MAX() function returns the largest value among the given values",
+                    subject: "Computer Applications",
+                    chapter: "MS Office",
+                    difficulty: "Easy",
+                    isPYQ: true,
+                    source: "Manual",
+                    needsReview: false
                 }
             ];
             
             this.questions = sampleQuestions;
             this.saveQuestions();
+            console.log(`Initialized with ${sampleQuestions.length} sample questions`);
         }
     }
 
@@ -3801,76 +3894,202 @@ D) 6</pre>
             return;
         }
 
+        console.log(`Starting ${testType} test with ${this.questions.length} questions available`);
+        
         let testConfig = {};
         
         switch(testType) {
             case 'fullMock':
-                testConfig = {
-                    title: 'Full Mock Test',
-                    duration: 90, // 90 minutes for full test
-                    subjects: {
-                        'Mathematics': 20,
-                        'General Intelligence & Reasoning': 15,
-                        'Basic Science & Engineering': 35,
-                        'General Awareness': 10,
-                        'Computer Applications': 20
-                    },
-                    totalQuestions: 100
-                };
+                testConfig = this.generateAdaptiveFullMockConfig();
                 break;
             case 'pyq':
-                const pyqQuestions = this.questions.filter(q => q.isPYQ);
-                if (pyqQuestions.length === 0) {
-                    alert('No Previous Year Questions available. Please add PYQ questions first.');
-                    return;
-                }
-                testConfig = {
-                    title: 'Previous Year Questions Test',
-                    duration: 60, // 60 minutes for PYQ test
-                    subjects: {
-                        'Mathematics': Math.min(10, pyqQuestions.filter(q => q.subject === 'Mathematics').length),
-                        'General Intelligence & Reasoning': Math.min(8, pyqQuestions.filter(q => q.subject === 'General Intelligence & Reasoning').length),
-                        'Basic Science & Engineering': Math.min(15, pyqQuestions.filter(q => q.subject === 'Basic Science & Engineering').length),
-                        'General Awareness': Math.min(5, pyqQuestions.filter(q => q.subject === 'General Awareness').length),
-                        'Computer Applications': Math.min(10, pyqQuestions.filter(q => q.subject === 'Computer Applications').length)
-                    },
-                    totalQuestions: Math.min(50, pyqQuestions.length),
-                    pyqOnly: true
-                };
+                testConfig = this.generateAdaptivePYQConfig();
                 break;
             case 'subjectWise':
-                const subjectSelect = document.querySelector('.test-subject-select');
-                const subject = subjectSelect ? subjectSelect.value : 'Mathematics';
-                const subjectQuestions = this.questions.filter(q => q.subject === subject);
-                
-                if (subjectQuestions.length === 0) {
-                    alert(`No questions available for ${subject}. Please add questions for this subject first.`);
-                    return;
-                }
-                
-                testConfig = {
-                    title: `${subject} Test`,
-                    duration: 30, // 30 minutes for subject test
-                    subjects: { [subject]: Math.min(25, subjectQuestions.length) },
-                    totalQuestions: Math.min(25, subjectQuestions.length)
-                };
+                testConfig = this.generateSubjectWiseConfig();
                 break;
             default:
                 alert('Invalid test type');
                 return;
         }
 
+        if (!testConfig) {
+            return; // Error already shown by the config generation method
+        }
+
+        console.log('Generated test config:', testConfig);
         this.generateTest(testConfig);
+    }
+
+    generateAdaptiveFullMockConfig() {
+        // Get available questions by subject
+        const availableBySubject = this.getQuestionCountBySubject();
+        console.log('Available questions by subject:', availableBySubject);
+        
+        const totalAvailable = this.questions.length;
+        
+        if (totalAvailable < 5) {
+            alert(`Not enough questions for a Full Mock Test. Available: ${totalAvailable}, Minimum required: 5\n\nPlease add more questions to the question bank.`);
+            return null;
+        }
+
+        // Define ideal proportions for RRB test
+        const idealProportions = {
+            'Mathematics': 0.20,
+            'General Intelligence & Reasoning': 0.15,
+            'Basic Science & Engineering': 0.35,
+            'General Awareness': 0.10,
+            'Computer Applications': 0.20
+        };
+
+        // Calculate adaptive test size (aim for 25-100 questions based on availability)
+        let targetQuestions = Math.min(100, Math.max(25, totalAvailable));
+        if (totalAvailable < 25) {
+            targetQuestions = Math.max(5, totalAvailable); // Use all available if less than 25
+        }
+
+        // Calculate distribution based on availability and ideal proportions
+        const subjects = this.calculateAdaptiveDistribution(availableBySubject, idealProportions, targetQuestions);
+        
+        const actualTotal = Object.values(subjects).reduce((sum, count) => sum + count, 0);
+        
+        console.log(`Full Mock Test: Using ${actualTotal} questions out of ${totalAvailable} available`);
+        console.log('Subject distribution:', subjects);
+
+        return {
+            title: `Full Mock Test (${actualTotal} Questions)`,
+            duration: Math.max(30, Math.min(90, Math.ceil(actualTotal * 0.9))), // ~0.9 min per question
+            subjects: subjects,
+            totalQuestions: actualTotal,
+            isAdaptive: true
+        };
+    }
+
+    generateAdaptivePYQConfig() {
+        const pyqQuestions = this.questions.filter(q => q.isPYQ);
+        console.log(`PYQ questions available: ${pyqQuestions.length}`);
+        
+        if (pyqQuestions.length === 0) {
+            alert('No Previous Year Questions available. Please add PYQ questions first.');
+            return null;
+        }
+
+        const availableBySubject = this.getQuestionCountBySubject(pyqQuestions);
+        console.log('Available PYQ questions by subject:', availableBySubject);
+
+        const idealProportions = {
+            'Mathematics': 0.25,
+            'General Intelligence & Reasoning': 0.20,
+            'Basic Science & Engineering': 0.30,
+            'General Awareness': 0.15,
+            'Computer Applications': 0.10
+        };
+
+        let targetQuestions = Math.min(50, Math.max(5, pyqQuestions.length));
+        const subjects = this.calculateAdaptiveDistribution(availableBySubject, idealProportions, targetQuestions);
+        
+        const actualTotal = Object.values(subjects).reduce((sum, count) => sum + count, 0);
+
+        return {
+            title: `PYQ Test (${actualTotal} Questions)`,
+            duration: Math.max(20, Math.min(60, Math.ceil(actualTotal * 0.8))), // ~0.8 min per question
+            subjects: subjects,
+            totalQuestions: actualTotal,
+            pyqOnly: true,
+            isAdaptive: true
+        };
+    }
+
+    generateSubjectWiseConfig() {
+        const subjectSelect = document.querySelector('.test-subject-select');
+        const subject = subjectSelect ? subjectSelect.value : 'Mathematics';
+        const subjectQuestions = this.questions.filter(q => q.subject === subject);
+        
+        console.log(`Subject-wise test for ${subject}: ${subjectQuestions.length} questions available`);
+        
+        if (subjectQuestions.length === 0) {
+            alert(`No questions available for ${subject}. Please add questions for this subject first.`);
+            return null;
+        }
+
+        const questionCount = Math.min(25, subjectQuestions.length);
+        
+        return {
+            title: `${subject} Test (${questionCount} Questions)`,
+            duration: Math.max(15, Math.min(30, Math.ceil(questionCount * 1.2))), // ~1.2 min per question
+            subjects: { [subject]: questionCount },
+            totalQuestions: questionCount,
+            isAdaptive: true
+        };
+    }
+
+    getQuestionCountBySubject(questionSet = null) {
+        const questions = questionSet || this.questions;
+        const counts = {};
+        
+        questions.forEach(q => {
+            const subject = q.subject || 'Unknown';
+            counts[subject] = (counts[subject] || 0) + 1;
+        });
+        
+        return counts;
+    }
+
+    calculateAdaptiveDistribution(availableBySubject, idealProportions, targetQuestions) {
+        const subjects = {};
+        const subjectNames = Object.keys(idealProportions);
+        
+        // First pass: allocate based on ideal proportions, but limited by availability
+        let allocated = 0;
+        subjectNames.forEach(subject => {
+            const available = availableBySubject[subject] || 0;
+            if (available > 0) {
+                const ideal = Math.floor(targetQuestions * idealProportions[subject]);
+                const allocation = Math.min(ideal, available);
+                subjects[subject] = allocation;
+                allocated += allocation;
+            }
+        });
+
+        // Second pass: distribute remaining questions proportionally among subjects with availability
+        let remaining = targetQuestions - allocated;
+        while (remaining > 0 && allocated < targetQuestions) {
+            let distributed = false;
+            
+            for (const subject of subjectNames) {
+                const available = availableBySubject[subject] || 0;
+                const current = subjects[subject] || 0;
+                
+                if (current < available && remaining > 0) {
+                    subjects[subject] = current + 1;
+                    remaining--;
+                    allocated++;
+                    distributed = true;
+                }
+            }
+            
+            // If we can't distribute any more, break to avoid infinite loop
+            if (!distributed) break;
+        }
+
+        // Remove subjects with 0 questions
+        Object.keys(subjects).forEach(subject => {
+            if (subjects[subject] === 0) {
+                delete subjects[subject];
+            }
+        });
+
+        return subjects;
     }
 
     startCustomTest() {
         const totalQuestionsInput = document.getElementById('totalQuestionsInput');
         const testDurationInput = document.getElementById('testDurationInput');
         
-        const totalQuestions = totalQuestionsInput ? parseInt(totalQuestionsInput.value) : 25;
+        const requestedQuestions = totalQuestionsInput ? parseInt(totalQuestionsInput.value) : 25;
         const duration = testDurationInput ? parseInt(testDurationInput.value) : 30;
         
-        if (totalQuestions < 1 || totalQuestions > 100) {
+        if (requestedQuestions < 1 || requestedQuestions > 100) {
             alert('Total questions must be between 1 and 100');
             return;
         }
@@ -3880,39 +4099,93 @@ D) 6</pre>
             return;
         }
 
-        const subjects = {};
+        const requestedSubjects = {};
         let subjectTotal = 0;
         
+        // Get user's requested distribution
         document.querySelectorAll('.subject-count').forEach(input => {
             const count = parseInt(input.value) || 0;
             if (count > 0) {
-                subjects[input.dataset.subject] = count;
+                requestedSubjects[input.dataset.subject] = count;
                 subjectTotal += count;
             }
         });
 
-        if (Object.keys(subjects).length === 0) {
+        if (Object.keys(requestedSubjects).length === 0) {
             alert('Please select at least one subject with question count > 0');
             return;
         }
 
-        if (subjectTotal !== totalQuestions) {
-            alert(`Subject distribution (${subjectTotal}) doesn't match total questions (${totalQuestions})`);
+        if (subjectTotal !== requestedQuestions) {
+            alert(`Subject distribution (${subjectTotal}) doesn't match total questions (${requestedQuestions})`);
             return;
         }
 
+        // Check availability and adapt if necessary
+        const availableBySubject = this.getQuestionCountBySubject();
+        const adaptedSubjects = {};
+        let totalAvailable = 0;
+        let hasChanges = false;
+
+        console.log('Custom test requested distribution:', requestedSubjects);
+        console.log('Available questions by subject:', availableBySubject);
+
+        // Validate and adapt the distribution
+        for (const [subject, requested] of Object.entries(requestedSubjects)) {
+            const available = availableBySubject[subject] || 0;
+            const allocated = Math.min(requested, available);
+            
+            if (allocated > 0) {
+                adaptedSubjects[subject] = allocated;
+                totalAvailable += allocated;
+            }
+            
+            if (allocated < requested) {
+                hasChanges = true;
+                console.log(`${subject}: requested ${requested}, allocated ${allocated}`);
+            }
+        }
+
+        if (totalAvailable < 3) {
+            alert(`Not enough questions available for custom test.\nRequested: ${requestedQuestions}\nAvailable: ${totalAvailable}\nMinimum required: 3\n\nPlease add more questions or adjust your selection.`);
+            return;
+        }
+
+        // Show adaptation warning if needed
+        if (hasChanges) {
+            const changes = Object.entries(requestedSubjects).map(([subject, requested]) => {
+                const allocated = adaptedSubjects[subject] || 0;
+                const available = availableBySubject[subject] || 0;
+                if (allocated < requested) {
+                    return `${subject}: ${allocated}/${requested} (only ${available} available)`;
+                }
+                return null;
+            }).filter(Boolean);
+
+            const message = `Custom test adapted to available questions:\n\n${changes.join('\n')}\n\nTotal questions: ${totalAvailable}/${requestedQuestions}\n\nProceed with adapted test?`;
+            
+            if (!confirm(message)) {
+                return;
+            }
+        }
+
         const testConfig = {
-            title: 'Custom Test',
-            duration: duration,
-            subjects: subjects,
-            totalQuestions: totalQuestions
+            title: `Custom Test (${totalAvailable} Questions)`,
+            duration: Math.max(10, Math.min(duration, Math.ceil(totalAvailable * 1.5))), // Adjust duration if needed
+            subjects: adaptedSubjects,
+            totalQuestions: totalAvailable,
+            isAdaptive: hasChanges,
+            isCustom: true
         };
+
+        console.log('Final custom test config:', testConfig);
 
         this.hideModal('customTestModal');
         this.generateTest(testConfig);
     }
 
     generateTest(config) {
+        console.log('Generating test with config:', config);
         let selectedQuestions = [];
         
         // Handle practice set tests differently
@@ -3948,23 +4221,20 @@ D) 6</pre>
             return this.testSession;
         }
         
-        // Regular test generation logic
-        for (const [subject, count] of Object.entries(config.subjects)) {
-            let subjectQuestions = this.questions.filter(q => q.subject === subject);
-            
-            if (config.pyqOnly) {
-                subjectQuestions = subjectQuestions.filter(q => q.isPYQ);
-            }
-            
-            if (subjectQuestions.length < count) {
-                alert(`Not enough questions for ${subject}. Available: ${subjectQuestions.length}, Required: ${count}`);
-                return;
-            }
-            
-            // Shuffle and select required count
-            subjectQuestions = this.shuffleArray([...subjectQuestions]);
-            selectedQuestions.push(...subjectQuestions.slice(0, count));
+        // Enhanced test generation logic with better error handling
+        const questionSelection = this.selectQuestionsForTest(config);
+        
+        if (!questionSelection.success) {
+            alert(questionSelection.message);
+            return;
         }
+        
+        selectedQuestions = questionSelection.questions;
+        console.log(`Selected ${selectedQuestions.length} questions for test`);
+
+        // Log question distribution
+        const distribution = this.getQuestionCountBySubject(selectedQuestions);
+        console.log('Final question distribution:', distribution);
 
         // Shuffle final question order
         selectedQuestions = this.shuffleArray(selectedQuestions);
@@ -3977,7 +4247,11 @@ D) 6</pre>
         // Create test session
         this.testSession = {
             id: 'test_' + Date.now(),
-            config: config,
+            config: {
+                ...config,
+                actualQuestions: selectedQuestions.length,
+                distribution: distribution
+            },
             questions: selectedQuestions,
             answers: new Array(selectedQuestions.length).fill(-1),
             timeSpent: new Array(selectedQuestions.length).fill(0),
@@ -3988,6 +4262,13 @@ D) 6</pre>
             questionStartTime: Date.now()
         };
 
+        console.log('Test session created:', {
+            id: this.testSession.id,
+            questionCount: selectedQuestions.length,
+            duration: config.duration,
+            subjects: Object.keys(config.subjects)
+        });
+
         this.switchSection('testInterface');
         setTimeout(() => {
             this.initializeTestInterface();
@@ -3996,10 +4277,107 @@ D) 6</pre>
         return this.testSession;
     }
 
+    selectQuestionsForTest(config) {
+        const result = {
+            success: false,
+            questions: [],
+            message: '',
+            warnings: []
+        };
+
+        const questionPool = config.pyqOnly ? 
+            this.questions.filter(q => q.isPYQ) : 
+            this.questions;
+
+        console.log(`Question pool size: ${questionPool.length} (PYQ only: ${config.pyqOnly || false})`);
+
+        if (questionPool.length === 0) {
+            result.message = config.pyqOnly ? 
+                'No PYQ questions available. Please add Previous Year Questions first.' :
+                'No questions available. Please add questions to the question bank first.';
+            return result;
+        }
+
+        const selectedQuestions = [];
+        const actualDistribution = {};
+        let totalSelected = 0;
+
+        // Try to select questions for each subject
+        for (const [subject, requiredCount] of Object.entries(config.subjects)) {
+            const subjectQuestions = questionPool.filter(q => q.subject === subject);
+            console.log(`${subject}: ${subjectQuestions.length} available, ${requiredCount} required`);
+            
+            if (subjectQuestions.length === 0) {
+                result.warnings.push(`No questions available for ${subject}`);
+                continue;
+            }
+
+            const availableCount = Math.min(requiredCount, subjectQuestions.length);
+            
+            if (availableCount < requiredCount) {
+                result.warnings.push(`Only ${availableCount} questions available for ${subject} (requested ${requiredCount})`);
+            }
+
+            // Shuffle and select questions
+            const shuffled = this.shuffleArray([...subjectQuestions]);
+            const selected = shuffled.slice(0, availableCount);
+            
+            selectedQuestions.push(...selected);
+            actualDistribution[subject] = availableCount;
+            totalSelected += availableCount;
+            
+            console.log(`Selected ${availableCount} questions for ${subject}`);
+        }
+
+        // Check if we have minimum viable test
+        if (totalSelected < 3) {
+            result.message = `Not enough questions for a viable test. Available: ${totalSelected}, Minimum required: 3\n\nPlease add more questions to the question bank.`;
+            return result;
+        }
+
+        // Add warnings to user if any
+        if (result.warnings.length > 0 && config.isAdaptive) {
+            const warningMessage = `Test adapted to available questions:\n\n${result.warnings.join('\n')}\n\nTotal questions: ${totalSelected}`;
+            console.log('Test generation warnings:', warningMessage);
+            
+            // Show warning but continue (for adaptive tests)
+            setTimeout(() => {
+                alert(`ℹ️ ${warningMessage}\n\nThe test will proceed with the available questions.`);
+            }, 500);
+        }
+
+        result.success = true;
+        result.questions = selectedQuestions;
+        result.message = `Successfully selected ${totalSelected} questions`;
+        
+        return result;
+    }
+
     initializeTestInterface() {
         const testTitleEl = document.getElementById('testTitle');
-        if (testTitleEl) {
-            testTitleEl.textContent = this.testSession.config.title;
+        if (testTitleEl && this.testSession?.config) {
+            let title = this.testSession.config.title;
+            
+            // Add distribution info for adaptive tests
+            if (this.testSession.config.isAdaptive && this.testSession.config.distribution) {
+                const distInfo = Object.entries(this.testSession.config.distribution)
+                    .map(([subject, count]) => `${subject.substring(0, 4)}: ${count}`)
+                    .join(' | ');
+                title += ` [${distInfo}]`;
+            }
+            
+            testTitleEl.textContent = title;
+            console.log('Test interface initialized with title:', title);
+        }
+        
+        // Log test session details for debugging
+        if (this.testSession) {
+            console.log('Test session details:', {
+                questions: this.testSession.questions.length,
+                duration: this.testSession.duration / 60000, // Convert to minutes
+                subjects: Object.keys(this.testSession.config.subjects || {}),
+                isAdaptive: this.testSession.config.isAdaptive
+            });
         }
         
         this.startTimer();
