@@ -1759,8 +1759,38 @@ class MockTestApp {
             this.updateProcessingStep('Validating extracted questions...');
             console.log('PDF metadata before validation:', this.currentPDFMetadata);
             
-            // Filter and validate questions
-            let validQuestions = this.validateAndFilterQuestions(extractedQuestions);
+        // Enhanced processing with batch support for large datasets  
+        if (extractedQuestions.length > 500) {
+            this.updateProcessingStep(`🔄 Processing large dataset: ${extractedQuestions.length} questions found. Implementing optimizations...`);
+            
+            // Process in batches for better performance
+            const batchSize = 100;
+            let processedQuestions = [];
+            
+            for (let i = 0; i < extractedQuestions.length; i += batchSize) {
+                const batch = extractedQuestions.slice(i, i + batchSize);
+                const batchNumber = Math.floor(i / batchSize) + 1;
+                const totalBatches = Math.ceil(extractedQuestions.length / batchSize);
+                
+                this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
+                
+                // Add small delay to prevent UI blocking
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                const validatedBatch = this.validateAndFilterQuestions(batch);
+                processedQuestions.push(...validatedBatch);
+                
+                // Update progress
+                const progress = Math.round((i + batch.length) / extractedQuestions.length * 100);
+                this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions processed)`);
+            }
+            
+            validQuestions = processedQuestions;
+            this.updateProcessingStep(`✅ Large dataset processing complete: ${validQuestions.length} valid questions`);
+        } else {
+            // Filter and validate questions normally for smaller datasets
+            validQuestions = this.validateAndFilterQuestions(extractedQuestions);
+        }
             
             // AI Chapter Detection
             if (isAutoDetectEnabled && validQuestions.length > 0 && this.currentPDFMetadata.subject !== 'Mixed/Practice Books') {
@@ -2370,46 +2400,111 @@ class MockTestApp {
     validateAndFilterQuestions(questions) {
         console.log('Validating and filtering questions with metadata:', this.currentPDFMetadata);
         
-        const validQuestions = questions.filter(question => {
-            // Additional validation checks
-            if (!question.text || question.text.length < 10) {
-                console.warn(`Question ${question.number}: Text too short`);
+        // Enhanced validation for large datasets and malformed content
+        const validQuestions = questions.filter((question, index) => {
+            // Progress indicator for large datasets
+            if (questions.length > 1000 && index % 100 === 0) {
+                console.log(`Validating questions: ${index}/${questions.length} (${Math.round(index/questions.length*100)}%)`);
+            }
+            
+            // Basic structure validation
+            if (!question.text || typeof question.text !== 'string') {
+                console.warn(`Question ${question.number || index}: Missing or invalid text`);
                 return false;
             }
             
-            if (question.text.length > 400) {
-                console.warn(`Question ${question.number}: Text too long, might contain mixed content`);
+            // Enhanced text length validation for malformed content
+            const cleanText = question.text.trim();
+            if (cleanText.length < 10) {
+                console.warn(`Question ${question.number || index}: Text too short (${cleanText.length} chars)`);
                 return false;
             }
             
-            if (!question.options || question.options.length !== 4) {
-                console.warn(`Question ${question.number}: Invalid options count`);
+            if (cleanText.length > 500) {
+                console.warn(`Question ${question.number || index}: Text too long (${cleanText.length} chars), likely malformed or mixed content`);
                 return false;
             }
             
-            // Check if any option is too long (might indicate mixed content)
-            if (question.options.some(opt => opt.length > 150)) {
-                console.warn(`Question ${question.number}: Option too long`);
+            // Enhanced options validation
+            if (!question.options || !Array.isArray(question.options) || question.options.length !== 4) {
+                console.warn(`Question ${question.number || index}: Invalid options structure (${question.options?.length || 'undefined'} options)`);
                 return false;
             }
             
-            // Check for duplicate options
+            // Check for malformed options
+            const validOptions = question.options.filter(opt => {
+                if (!opt || typeof opt !== 'string') return false;
+                const cleanOpt = opt.trim();
+                return cleanOpt.length > 0 && cleanOpt.length <= 200;
+            });
+            
+            if (validOptions.length !== 4) {
+                console.warn(`Question ${question.number || index}: Invalid options after cleaning (${validOptions.length}/4 valid)`);
+                return false;
+            }
+            
+            // Clean and normalize options
+            question.options = question.options.map(opt => opt.trim());
+            
+            // Check for duplicate options (malformed content indicator)
             const uniqueOptions = new Set(question.options.map(opt => opt.toLowerCase().trim()));
             if (uniqueOptions.size < 4) {
-                console.warn(`Question ${question.number}: Duplicate options found`);
+                console.warn(`Question ${question.number || index}: Duplicate options found`);
+                return false;
+            }
+            
+            // Enhanced content validation for mixed content detection
+            const questionWords = cleanText.toLowerCase().split(/\s+/);
+            const suspiciousPatterns = [
+                /^(page|chapter|section|\d+\.\d+)/i, // Starts with page/chapter references
+                /answer[s]?[:\s-]+[abcd]/i, // Contains answer keys
+                /solution[s]?[:\s-]/i, // Contains solution text
+                /(hint|tip|note)[:\s-]/i, // Contains hints/notes
+            ];
+            
+            const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(cleanText));
+            if (isSuspicious) {
+                console.warn(`Question ${question.number || index}: Contains suspicious content patterns`);
+                return false;
+            }
+            
+            // Check for reasonable question structure
+            if (!cleanText.includes('?') && !cleanText.match(/which|what|how|where|when|why|find|calculate|determine/i)) {
+                console.warn(`Question ${question.number || index}: Doesn't appear to be a proper question`);
                 return false;
             }
             
             return true;
         });
 
+        console.log(`Validation complete: ${validQuestions.length}/${questions.length} questions passed validation`);
+
         // CRITICAL FIX: Apply finalizeQuestion to each valid question to add metadata
-        const finalizedQuestions = validQuestions.map(question => {
-            console.log('Finalizing question:', question.number, 'with metadata:', this.currentPDFMetadata);
+        const finalizedQuestions = validQuestions.map((question, index) => {
+            // Progress indicator for large datasets
+            if (validQuestions.length > 1000 && index % 100 === 0) {
+                console.log(`Finalizing questions: ${index}/${validQuestions.length} (${Math.round(index/validQuestions.length*100)}%)`);
+            }
+            
             return this.finalizeQuestion(question);
         });
 
         console.log('Finalized questions with metadata:', finalizedQuestions.length);
+        
+        // Performance optimization for large datasets
+        if (finalizedQuestions.length > 500) {
+            console.log('Large dataset detected. Implementing performance optimizations...');
+            // Sort questions by difficulty and type for better test generation
+            finalizedQuestions.sort((a, b) => {
+                if (a.subject !== b.subject) return a.subject.localeCompare(b.subject);
+                if (a.difficulty !== b.difficulty) {
+                    const diffOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                    return (diffOrder[a.difficulty] || 2) - (diffOrder[b.difficulty] || 2);
+                }
+                return 0;
+            });
+        }
+        
         return finalizedQuestions;
     }
 
@@ -5783,6 +5878,104 @@ D) 6</pre>
         
         console.log('App cleanup completed');
     }
+
+    // Enhanced success message builder for better UX
+    buildSuccessMessage(extractedQuestions, practiceSetTests, processingTime) {
+        let message = '🎉 PDF Processing Complete!\n\n';
+        
+        if (extractedQuestions.length > 0) {
+            message += `📝 Questions Extracted: ${extractedQuestions.length}\n`;
+            
+            // Subject breakdown
+            const subjectCount = {};
+            extractedQuestions.forEach(q => {
+                const subject = this.getStandardizedSubjectName(q.subject);
+                subjectCount[subject] = (subjectCount[subject] || 0) + 1;
+            });
+            
+            message += '\n📊 Subject Distribution:\n';
+            Object.entries(subjectCount).forEach(([subject, count]) => {
+                message += `   • ${subject}: ${count} questions\n`;
+            });
+        }
+        
+        if (practiceSetTests.length > 0) {
+            message += `\n📚 Practice Sets Created: ${practiceSetTests.length}\n`;
+            practiceSetTests.forEach(set => {
+                message += `   • ${set.title}: ${set.totalQuestions} questions\n`;
+            });
+            message += '\n✨ Practice sets are available in the Dashboard for complete mock tests!';
+        }
+        
+        if (processingTime > 5000) {
+            message += `\n⏱️ Processing completed in ${Math.round(processingTime/1000)} seconds`;
+        }
+        
+        if (extractedQuestions.length > 1000) {
+            message += '\n\n🚀 Large dataset optimization applied for better performance!';
+        }
+        
+        message += '\n\n✅ All content has been saved and is ready for use.';
+        return message;
+    }
+
+    // Enhanced error message builder with actionable guidance
+    buildErrorMessage(error, pdfText) {
+        let message = '❌ PDF Processing Error\n\n';
+        message += `Error: ${error.message}\n\n`;
+        
+        // Provide specific guidance based on the error and content
+        if (!pdfText || pdfText.length < 100) {
+            message += '💡 Troubleshooting Tips:\n';
+            message += '• The PDF appears to be empty or unreadable\n';
+            message += '• Try uploading a different PDF file\n';
+            message += '• Ensure the PDF contains readable text (not just images)\n';
+            message += '• Check if the PDF is password-protected\n';
+        } else if (pdfText.length > 100000) {
+            message += '💡 Large File Detected:\n';
+            message += '• This is a very large PDF file\n';
+            message += '• Consider splitting it into smaller sections\n';
+            message += '• Try uploading one practice set at a time\n';
+            message += '• Ensure stable internet connection\n';
+        } else {
+            message += '💡 Common Solutions:\n';
+            message += '• Check if questions follow standard MCQ format\n';
+            message += '• Ensure questions are numbered (1., 2., 3., etc.)\n';
+            message += '• Verify options are labeled (A), B), C), D)\n';
+            message += '• Try uploading a different section of the PDF\n';
+        }
+        
+        message += '\n📞 Need Help?\n';
+        message += 'Contact support with the PDF file for assistance.';
+        
+        return message;
+    }
+
+    // Performance optimization for large question banks
+    optimizeForLargeDataset() {
+        if (this.questions.length > 1000) {
+            console.log('🔧 Applying large dataset optimizations...');
+            
+            // Sort questions by subject and difficulty for faster filtering
+            this.questions.sort((a, b) => {
+                if (a.subject !== b.subject) return a.subject.localeCompare(b.subject);
+                if (a.difficulty !== b.difficulty) {
+                    const diffOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                    return (diffOrder[a.difficulty] || 2) - (diffOrder[b.difficulty] || 2);
+                }
+                return 0;
+            });
+            
+            // Enable lazy loading for question bank display
+            this.enableLazyLoading = true;
+            
+            // Set up pagination for better performance
+            this.questionBankPageSize = 50;
+            this.currentQuestionBankPage = 1;
+            
+            console.log('✅ Large dataset optimizations applied');
+        }
+    }
 }
 
 // Initialize the application when the script loads
@@ -5795,11 +5988,32 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// Handle errors gracefully
+// Handle errors gracefully with enhanced debugging
 window.addEventListener('error', (event) => {
     console.error('Application error:', event.error);
-    // You could show a user-friendly error message here
+    
+    // Enhanced error handling for PDF processing and large datasets
+    if (event.error.message.includes('PDF') || event.error.message.includes('extraction')) {
+        alert('⚠️ An error occurred during PDF processing. Please try refreshing the page and uploading the PDF again.');
+    } else if (event.error.message.includes('memory') || event.error.message.includes('heap')) {
+        alert('⚠️ Memory limit reached. Please refresh the page and try processing smaller datasets.');
+    } else if (event.error.message.includes('timeout')) {
+        alert('⚠️ Processing timeout. The PDF might be too large. Try splitting it into smaller sections.');
+    }
 });
+
+// Add performance monitoring for large datasets
+if (window.performance && window.performance.memory) {
+    const checkMemory = () => {
+        const memory = window.performance.memory;
+        if (memory.usedJSHeapSize > 100000000) { // > 100MB
+            console.warn('⚠️ High memory usage detected. Consider clearing old data or refreshing the page.');
+        }
+    };
+    
+    // Check memory usage every 30 seconds
+    setInterval(checkMemory, 30000);
+}
 
 // Export for debugging (optional)
 if (typeof window !== 'undefined') {
