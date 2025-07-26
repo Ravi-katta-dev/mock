@@ -539,7 +539,7 @@ class MockTestApp {
             options: question.options || ['Option A', 'Option B', 'Option C', 'Option D'],
             correctAnswer: question.correctAnswer !== undefined ? question.correctAnswer : 0,
             explanation: question.explanation || 'No explanation provided',
-            subject: question.subject || 'General',
+            subject: this.getStandardizedSubjectName(question.subject || 'General'),
             chapter: question.chapter || 'Miscellaneous',
             difficulty: question.difficulty || 'Medium',
             isPYQ: question.isPYQ || false,
@@ -549,9 +549,14 @@ class MockTestApp {
             extractionSource: question.extractionSource || null
         };
 
-        // If the question has undefined values, log it for debugging
+        // If the question had undefined values, log it for debugging
         if (question.subject === undefined || question.chapter === undefined) {
             console.warn('Question had undefined values:', question.id, question.subject, question.chapter);
+        }
+
+        // Log subject normalization if it changed
+        if (question.subject && question.subject !== validated.subject) {
+            console.log(`Subject normalized: "${question.subject}" → "${validated.subject}"`);
         }
 
         return validated;
@@ -4369,6 +4374,96 @@ D) 6</pre>
         return this.testSession;
     }
 
+    // Enhanced subject name mapping for robust test generation
+    getStandardizedSubjectName(subjectName) {
+        if (!subjectName) return 'General';
+        
+        const subjectMappings = {
+            // Computer/Applications variations
+            'Computer Applications': 'Computer Applications',
+            'Basics of Computers and Applications': 'Computer Applications',
+            'Computer Science': 'Computer Applications',
+            'Computers': 'Computer Applications',
+            'Computer Fundamentals': 'Computer Applications',
+            'IT': 'Computer Applications',
+            'Information Technology': 'Computer Applications',
+            
+            // Science variations
+            'Basic Science & Engineering': 'Basic Science & Engineering',
+            'Basic Science': 'Basic Science & Engineering',
+            'Science & Engineering': 'Basic Science & Engineering',
+            'Engineering': 'Basic Science & Engineering',
+            'Physics': 'Basic Science & Engineering',
+            'Electronics': 'Basic Science & Engineering',
+            'Electrical': 'Basic Science & Engineering',
+            
+            // Reasoning variations
+            'General Intelligence & Reasoning': 'General Intelligence & Reasoning',
+            'Reasoning': 'General Intelligence & Reasoning',
+            'Intelligence': 'General Intelligence & Reasoning',
+            'Logical Reasoning': 'General Intelligence & Reasoning',
+            'Analytical Reasoning': 'General Intelligence & Reasoning',
+            
+            // Awareness variations
+            'General Awareness': 'General Awareness',
+            'GK': 'General Awareness',
+            'General Knowledge': 'General Awareness',
+            'Current Affairs': 'General Awareness',
+            
+            // Mathematics variations
+            'Mathematics': 'Mathematics',
+            'Math': 'Mathematics',
+            'Maths': 'Mathematics',
+            'Arithmetic': 'Mathematics',
+            'Quantitative': 'Mathematics'
+        };
+
+        // Direct mapping first
+        const mapped = subjectMappings[subjectName];
+        if (mapped) {
+            return mapped;
+        }
+
+        // Fuzzy matching for partial matches
+        const lowerSubject = subjectName.toLowerCase();
+        
+        // Computer-related
+        if (lowerSubject.includes('computer') || lowerSubject.includes('application') || 
+            lowerSubject.includes('software') || lowerSubject.includes('office')) {
+            return 'Computer Applications';
+        }
+        
+        // Science-related
+        if (lowerSubject.includes('science') || lowerSubject.includes('engineering') || 
+            lowerSubject.includes('physics') || lowerSubject.includes('electronic') || 
+            lowerSubject.includes('electrical') || lowerSubject.includes('technical')) {
+            return 'Basic Science & Engineering';
+        }
+        
+        // Reasoning-related
+        if (lowerSubject.includes('reasoning') || lowerSubject.includes('intelligence') || 
+            lowerSubject.includes('logical') || lowerSubject.includes('analytical')) {
+            return 'General Intelligence & Reasoning';
+        }
+        
+        // Awareness-related
+        if (lowerSubject.includes('awareness') || lowerSubject.includes('knowledge') || 
+            lowerSubject.includes('current') || lowerSubject.includes('affairs') || 
+            lowerSubject.includes('general') && (lowerSubject.includes('gk') || lowerSubject.includes('ga'))) {
+            return 'General Awareness';
+        }
+        
+        // Math-related
+        if (lowerSubject.includes('math') || lowerSubject.includes('arithmetic') || 
+            lowerSubject.includes('quantitative') || lowerSubject.includes('number')) {
+            return 'Mathematics';
+        }
+
+        // Return original if no mapping found
+        return subjectName;
+    }
+
+    // Enhanced question selection with subject name normalization
     selectQuestionsForTest(config) {
         const result = {
             success: false,
@@ -4394,20 +4489,48 @@ D) 6</pre>
         const actualDistribution = {};
         let totalSelected = 0;
 
-        // Try to select questions for each subject
-        for (const [subject, requiredCount] of Object.entries(config.subjects)) {
-            const subjectQuestions = questionPool.filter(q => q.subject === subject);
-            console.log(`${subject}: ${subjectQuestions.length} available, ${requiredCount} required`);
+        // Debug: Show available subjects in question pool
+        const availableSubjects = [...new Set(questionPool.map(q => this.getStandardizedSubjectName(q.subject)))];
+        console.log('Available subjects (standardized):', availableSubjects);
+        console.log('Requested subjects:', Object.keys(config.subjects));
+
+        // Try to select questions for each subject with enhanced matching
+        for (const [requestedSubject, requiredCount] of Object.entries(config.subjects)) {
+            // Find questions using both exact and standardized matching
+            let subjectQuestions = questionPool.filter(q => {
+                const standardizedQuestionSubject = this.getStandardizedSubjectName(q.subject);
+                const standardizedRequestedSubject = this.getStandardizedSubjectName(requestedSubject);
+                
+                return standardizedQuestionSubject === standardizedRequestedSubject || 
+                       q.subject === requestedSubject;
+            });
+
+            console.log(`${requestedSubject}: ${subjectQuestions.length} available, ${requiredCount} required`);
             
+            // If no direct match, try fallback strategies
             if (subjectQuestions.length === 0) {
-                result.warnings.push(`No questions available for ${subject}`);
-                continue;
+                console.log(`No direct match for ${requestedSubject}, trying fallback strategies...`);
+                
+                // Fallback 1: Try partial name matching
+                subjectQuestions = questionPool.filter(q => {
+                    const qSubjectLower = q.subject.toLowerCase();
+                    const reqSubjectLower = requestedSubject.toLowerCase();
+                    return qSubjectLower.includes(reqSubjectLower.split(' ')[0]) ||
+                           reqSubjectLower.includes(qSubjectLower.split(' ')[0]);
+                });
+                
+                if (subjectQuestions.length > 0) {
+                    console.log(`Fallback match found ${subjectQuestions.length} questions for ${requestedSubject}`);
+                } else {
+                    result.warnings.push(`No questions available for ${requestedSubject} (tried multiple matching strategies)`);
+                    continue;
+                }
             }
 
             const availableCount = Math.min(requiredCount, subjectQuestions.length);
             
             if (availableCount < requiredCount) {
-                result.warnings.push(`Only ${availableCount} questions available for ${subject} (requested ${requiredCount})`);
+                result.warnings.push(`Only ${availableCount} questions available for ${requestedSubject} (requested ${requiredCount})`);
             }
 
             // Shuffle and select questions
@@ -4415,15 +4538,31 @@ D) 6</pre>
             const selected = shuffled.slice(0, availableCount);
             
             selectedQuestions.push(...selected);
-            actualDistribution[subject] = availableCount;
+            actualDistribution[requestedSubject] = availableCount;
             totalSelected += availableCount;
             
-            console.log(`Selected ${availableCount} questions for ${subject}`);
+            console.log(`Selected ${availableCount} questions for ${requestedSubject}`);
+        }
+
+        // Fallback: If still not enough questions, try to get questions from any subject
+        if (totalSelected < 3 && questionPool.length >= 3) {
+            console.log('Applying final fallback: selecting questions from any subject');
+            const remainingQuestions = questionPool.filter(q => 
+                !selectedQuestions.find(sq => sq.id === q.id)
+            );
+            
+            const needed = Math.min(3 - totalSelected, remainingQuestions.length);
+            if (needed > 0) {
+                const fallbackSelected = this.shuffleArray([...remainingQuestions]).slice(0, needed);
+                selectedQuestions.push(...fallbackSelected);
+                totalSelected += needed;
+                result.warnings.push(`Added ${needed} questions from other subjects to meet minimum requirements`);
+            }
         }
 
         // Check if we have minimum viable test
         if (totalSelected < 3) {
-            result.message = `Not enough questions for a viable test. Available: ${totalSelected}, Minimum required: 3\n\nPlease add more questions to the question bank.`;
+            result.message = `Not enough questions for a viable test. Available: ${totalSelected}, Minimum required: 3\n\nAvailable subjects: ${availableSubjects.join(', ')}\n\nPlease add more questions to the question bank.`;
             return result;
         }
 
