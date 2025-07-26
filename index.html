@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RRB Technician Grade-3 Signal Mock Test</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PDF.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <!-- Welcome Screen -->
+    <div id="welcomeScreen" class="welcome-screen">
+        <div class="welcome-content">
+            <h1>RRB Technician Grade-3 Signal Mock Test</h1>
+            <p>Welcome to your comprehensive exam preparation platform</p>
+            <button id="createUserBtn" class="btn btn--primary btn--lg">Create User Profile</button>
+        </div>
+    </div>
+
+    <!-- User Creation Modal -->
+    <div id="userModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Create User Profile</h2>
+            <div class="form-group">
+                <label class="form-label">Enter Your Name:</label>
+                <input type="text" id="userName" class="form-control" placeholder="Your Name" required>
+            </div>
+            <div class="modal-actions">
+                <button id="saveUserBtn" class="btn btn--primary">Save Profile</button>
+                <button id="cancelUserBtn" class="btn btn--secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="main-app hidden">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1>RRB Mock Test</h1>
+                <div class="user-info">
+                    <span id="currentUser">Welcome!</span>
+                    <button id="switchUserBtn" class="btn btn--secondary btn--sm">Switch User</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <ul class="nav-menu">
+                <li><a href="#" class="nav-link active" data-section="dashboard">📊 Dashboard</a></li>
+                <li><a href="#" class="nav-link" data-section="questionBank">📚 Question Bank</a></li>
+                <li><a href="#" class="nav-link" data-section="testSelection">✏️ Take Tests</a></li>
+                <li><a href="#" class="nav-link" data-section="analytics">📈 Analytics</a></li>
+                <li><a href="#" class="nav-link" data-section="studyMaterials">📄 Study Materials</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="content-section active">
+                <h2>Dashboard</h2>
+                <div class="dashboard-grid">
+                    <div class="stats-card">
+                        <h3>Total Tests Taken</h3>
+                        <div class="stat-value" id="totalTests">0</div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>Average Score</h3>
+                        <div class="stat-value" id="averageScore">0%</div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>Best Score</h3>
+                        <div class="stat-value" id="bestScore">0%</div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>Questions in Bank</h3>
+                        <div class="stat-value" id="totalQuestions">0</div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <h3>Quick Actions</h3>
+                    <div class="action-cards">
+                        <div class="action-card" data-action="fullMockTest">
+                            <h4>🎯 Full Mock Test</h4>
+                            <p>Complete exam simulation with 100 questions</p>
+                        </div>
+                        <div class="action-card" data-action="customTest">
+                            <h4>⚙️ Custom Test</h4>
+                            <p>Create your personalized test</p>
+                        </div>
+                        <div class="action-card" data-action="pyqTest">
+                            <h4>📋 PYQ Test</h4>
+                            <p>Practice with previous year questions</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Question Bank Section -->
+            <section id="questionBank" class="content-section">
+                <div class="section-header">
+                    <h2>Question Bank Management</h2>
+                    <div class="header-actions">
+                        <button id="uploadQuestionsBtn" class="btn btn--primary">📄 Upload PDF Questions</button>
+                        <button id="addQuestionBtn" class="btn btn--secondary">➕ Add Question</button>
+                    </div>
+                </div>
+
+                <div class="filters">
+                    <select id="subjectFilter" class="form-control">
+                        <option value="">All Subjects</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="General Intelligence & Reasoning">General Intelligence & Reasoning</option>
+                        <option value="Basic Science & Engineering">Basic Science & Engineering</option>
+                        <option value="General Awareness">General Awareness</option>
+                        <option value="Computer Applications">Computer Applications</option>
+                    </select>
+                    <select id="difficultyFilter" class="form-control">
+                        <option value="">All Difficulties</option>
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                    </select>
+                    <input type="text" id="searchQuestions" class="form-control" placeholder="Search questions...">
+                </div>
+
+                <div class="questions-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Question</th>
+                                <th>Subject</th>
+                                <th>Chapter</th>
+                                <th>Difficulty</th>
+                                <th>PYQ</th>
+                                <th>Source</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="questionsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Test Selection Section -->
+            <section id="testSelection" class="content-section">
+                <h2>Take Tests</h2>
+                <div class="test-types">
+                    <div class="test-type-card" data-test="fullMock">
+                        <h3>🎯 Full Mock Test</h3>
+                        <p>100 questions, 90 minutes</p>
+                        <p>Subject-wise distribution as per exam pattern</p>
+                        <button class="btn btn--primary">Start Test</button>
+                    </div>
+                    
+                    <div class="test-type-card" data-test="subjectWise">
+                        <h3>📖 Subject-wise Tests</h3>
+                        <p>Focus on individual subjects</p>
+                        <select class="form-control test-subject-select">
+                            <option value="Mathematics">Mathematics (20 questions)</option>
+                            <option value="General Intelligence & Reasoning">Reasoning (15 questions)</option>
+                            <option value="Basic Science & Engineering">Basic Science (35 questions)</option>
+                            <option value="General Awareness">General Awareness (10 questions)</option>
+                            <option value="Computer Applications">Computer Applications (20 questions)</option>
+                        </select>
+                        <button class="btn btn--primary">Start Subject Test</button>
+                    </div>
+
+                    <div class="test-type-card" data-test="custom">
+                        <h3>⚙️ Custom Test</h3>
+                        <p>Create your personalized test</p>
+                        <button class="btn btn--primary" id="configureCustomTest">Configure Test</button>
+                    </div>
+
+                    <div class="test-type-card" data-test="pyq">
+                        <h3>📋 Previous Year Questions</h3>
+                        <p>Practice with actual exam questions</p>
+                        <button class="btn btn--primary">Start PYQ Test</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Test Interface -->
+            <section id="testInterface" class="content-section test-interface">
+                <div class="test-header">
+                    <div class="test-info">
+                        <h3 id="testTitle">Test Name</h3>
+                        <span id="testProgress">Question 1 of 100</span>
+                    </div>
+                    <div class="timer">
+                        <span id="timeRemaining">90:00</span>
+                    </div>
+                </div>
+
+                <div class="test-body">
+                    <div class="question-area">
+                        <div class="question-content">
+                            <div class="question-number">Question <span id="currentQuestionNum">1</span></div>
+                            <div class="question-text" id="questionText"></div>
+                            <div class="question-options" id="questionOptions"></div>
+                        </div>
+                        
+                        <div class="question-actions">
+                            <button id="markForReview" class="btn btn--secondary">🔖 Mark for Review</button>
+                            <button id="clearResponse" class="btn btn--outline">🗑️ Clear Response</button>
+                        </div>
+                    </div>
+
+                    <div class="question-palette">
+                        <h4>Question Palette</h4>
+                        <div class="palette-legend">
+                            <span class="legend-item"><span class="status-indicator answered"></span>Answered</span>
+                            <span class="legend-item"><span class="status-indicator not-answered"></span>Not Answered</span>
+                            <span class="legend-item"><span class="status-indicator marked"></span>Marked</span>
+                            <span class="legend-item"><span class="status-indicator current"></span>Current</span>
+                        </div>
+                        <div class="palette-grid" id="questionPalette"></div>
+                        <button id="submitTest" class="btn btn--primary btn--full-width">Submit Test</button>
+                    </div>
+                </div>
+
+                <div class="test-navigation">
+                    <button id="previousQuestion" class="btn btn--secondary">⬅️ Previous</button>
+                    <button id="nextQuestion" class="btn btn--secondary">Next ➡️</button>
+                </div>
+            </section>
+
+            <!-- Test Review Section -->
+            <section id="testReview" class="content-section">
+                <div class="review-header">
+                    <h2>📊 Test Review</h2>
+                    <div class="review-summary" id="reviewSummary"></div>
+                </div>
+
+                <div class="review-filters">
+                    <button class="filter-btn active" data-filter="all">All Questions</button>
+                    <button class="filter-btn" data-filter="correct">✅ Correct</button>
+                    <button class="filter-btn" data-filter="incorrect">❌ Incorrect</button>
+                    <button class="filter-btn" data-filter="unattempted">⚪ Unattempted</button>
+                    <button class="filter-btn" data-filter="marked">🔖 Marked for Review</button>
+                </div>
+
+                <div class="review-questions" id="reviewQuestions"></div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section id="analytics" class="content-section">
+                <h2>📈 Performance Analytics</h2>
+                <div class="analytics-tabs">
+                    <button class="tab-btn active" data-tab="overview">📊 Overview</button>
+                    <button class="tab-btn" data-tab="subjects">📚 Subject Analysis</button>
+                    <button class="tab-btn" data-tab="progress">📈 Progress Tracking</button>
+                    <button class="tab-btn" data-tab="time">⏱️ Time Analysis</button>
+                </div>
+
+                <div class="analytics-content">
+                    <div class="tab-content active" id="overviewTab">
+                        <div class="charts-grid">
+                            <div class="chart-container">
+                                <h3>Overall Performance</h3>
+                                <canvas id="performanceChart"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <h3>Subject-wise Accuracy</h3>
+                                <canvas id="subjectChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="subjectsTab">
+                        <div class="chart-container">
+                            <h3>Subject-wise Performance Radar</h3>
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="progressTab">
+                        <div class="chart-container">
+                            <h3>Score Progress Over Time</h3>
+                            <canvas id="progressChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="timeTab">
+                        <div class="chart-container">
+                            <h3>Time Spent Analysis</h3>
+                            <canvas id="timeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Enhanced Study Materials Section -->
+            <section id="studyMaterials" class="content-section">
+                <div class="section-header">
+                    <h2>📄 Study Materials</h2>
+                    <button id="uploadPdfBtn" class="btn btn--primary">📤 Upload PDF</button>
+                </div>
+
+                <div class="materials-grid">
+                    <div class="pdf-list" id="pdfList">
+                        <!-- PDF items will be dynamically inserted here -->
+                    </div>
+                </div>
+
+                <!-- PDF Viewer -->
+                <div class="pdf-viewer hidden" id="pdfViewer">
+                    <div class="pdf-controls">
+                        <button id="closePdfViewer" class="btn btn--secondary">❌ Close</button>
+                        <div class="pdf-navigation">
+                            <button id="prevPage" class="btn btn--secondary btn--sm">⬅️ Previous</button>
+                            <span id="pageInfo">Page 1 of 1</span>
+                            <button id="nextPage" class="btn btn--secondary btn--sm">Next ➡️</button>
+                        </div>
+                        <div class="pdf-zoom">
+                            <button id="zoomOut" class="btn btn--secondary btn--sm">🔍➖ Zoom Out</button>
+                            <button id="zoomIn" class="btn btn--secondary btn--sm">🔍➕ Zoom In</button>
+                        </div>
+                        <input type="text" id="pdfSearch" placeholder="🔍 Search in PDF..." class="form-control">
+                    </div>
+                    <div class="pdf-content" id="pdfContent">
+                        <canvas id="pdfCanvas"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Custom Test Configuration Modal -->
+    <div id="customTestModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <h2>⚙️ Configure Custom Test</h2>
+            <div class="custom-test-config">
+                <div class="config-section">
+                    <h3>📝 Test Settings</h3>
+                    <div class="form-group">
+                        <label class="form-label">Total Questions:</label>
+                        <input type="number" id="totalQuestionsInput" class="form-control" value="50" min="10" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Time Duration (minutes):</label>
+                        <input type="number" id="testDurationInput" class="form-control" value="45" min="10" max="90">
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>📚 Subject Distribution</h3>
+                    <div class="subject-config">
+                        <div class="subject-item">
+                            <label>Mathematics:</label>
+                            <input type="number" class="form-control subject-count" data-subject="Mathematics" value="10" min="0">
+                        </div>
+                        <div class="subject-item">
+                            <label>Reasoning:</label>
+                            <input type="number" class="form-control subject-count" data-subject="General Intelligence & Reasoning" value="8" min="0">
+                        </div>
+                        <div class="subject-item">
+                            <label>Basic Science:</label>
+                            <input type="number" class="form-control subject-count" data-subject="Basic Science & Engineering" value="17" min="0">
+                        </div>
+                        <div class="subject-item">
+                            <label>General Awareness:</label>
+                            <input type="number" class="form-control subject-count" data-subject="General Awareness" value="5" min="0">
+                        </div>
+                        <div class="subject-item">
+                            <label>Computer Applications:</label>
+                            <input type="number" class="form-control subject-count" data-subject="Computer Applications" value="10" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="startCustomTest" class="btn btn--primary">🚀 Start Custom Test</button>
+                <button id="cancelCustomTest" class="btn btn--secondary">❌ Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Edit Modal -->
+    <div id="questionModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <h2 id="questionModalTitle">➕ Add Question</h2>
+            <form id="questionForm">
+                <div class="form-group">
+                    <label class="form-label">Question Text:</label>
+                    <textarea id="questionTextInput" class="form-control" rows="3" required placeholder="Enter your question here..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Options:</label>
+                    <div class="options-input">
+                        <input type="text" id="option1" class="form-control" placeholder="Option A" required>
+                        <input type="text" id="option2" class="form-control" placeholder="Option B" required>
+                        <input type="text" id="option3" class="form-control" placeholder="Option C" required>
+                        <input type="text" id="option4" class="form-control" placeholder="Option D" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Correct Answer:</label>
+                    <select id="correctAnswerSelect" class="form-control" required>
+                        <option value="0">Option A</option>
+                        <option value="1">Option B</option>
+                        <option value="2">Option C</option>
+                        <option value="3">Option D</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Explanation:</label>
+                    <textarea id="explanationInput" class="form-control" rows="3" required placeholder="Provide explanation for the correct answer..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Subject:</label>
+                        <select id="subjectSelect" class="form-control" required>
+                            <option value="Mathematics">Mathematics</option>
+                            <option value="General Intelligence & Reasoning">General Intelligence & Reasoning</option>
+                            <option value="Basic Science & Engineering">Basic Science & Engineering</option>
+                            <option value="General Awareness">General Awareness</option>
+                            <option value="Computer Applications">Computer Applications</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Chapter:</label>
+                        <input type="text" id="chapterInput" class="form-control" required placeholder="e.g., Algebra, Geometry">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Difficulty:</label>
+                        <select id="difficultySelect" class="form-control" required>
+                            <option value="Easy">Easy</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="isPyqCheckbox"> Previous Year Question
+                        </label>
+                    </div>
+                </div>
+            </form>
+
+            <div class="modal-actions">
+                <button id="saveQuestion" class="btn btn--primary">💾 Save Question</button>
+                <button id="cancelQuestion" class="btn btn--secondary">❌ Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced PDF Upload Modal -->
+    <div id="pdfUploadModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <h2>📤 Upload PDF Question Bank</h2>
+            <div class="upload-workflow">
+                <div class="upload-step">
+                    <h3>📄 Step 1: Select PDF File</h3>
+                    <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon">📄</div>
+                        <p>Click to select PDF file or drag and drop</p>
+                        <p class="upload-hint">Supported format: PDF (Max 50MB)</p>
+                    </div>
+                </div>
+
+                <div class="upload-step" id="pdfInfo" style="display: none;">
+                    <!-- PDF info will be populated dynamically -->
+                </div>
+
+                <div class="upload-step" id="processingStatus" style="display: none;">
+                    <!-- Processing status will be shown here -->
+                </div>
+
+                <div class="upload-step" id="extractedQuestionsPreview" style="display: none;">
+                    <!-- Extracted questions preview will be shown here -->
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="processPDF" class="btn btn--primary">⚙️ Process PDF</button>
+                <button id="cancelPDFUpload" class="btn btn--secondary">❌ Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Review Modal -->
+    <div id="questionReviewModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <h2>🔍 Review Extracted Questions</h2>
+            <div id="questionReviewContainer">
+                <!-- Individual question review will be shown here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize PDF.js worker
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>
