@@ -45,3 +45,168 @@ cd mock-test-app
 
 # If using VS Code with Live Server extension
 # Right-click index.html → "Open with Live Server"
+
+
+🎯 Quick Start Guide
+1. First Time Setup
+Open the app in your browser
+Create a user profile with your name
+You'll see the dashboard with sample questions loaded
+2. Adding Questions
+Manual Entry:
+
+Go to "Question Bank" section
+Click "Add Question"
+Fill in question details and save
+PDF Upload:
+
+Click "Upload PDF Questions"
+Select your PDF file with questions
+Set subject and chapter information
+Review and confirm extracted questions
+3. Taking Tests
+Navigate to "Take Tests" section
+
+Choose your test type:
+
+Full Mock Test: Complete exam simulation
+Subject-wise Test: Focus on specific subjects
+Custom Test: Configure your own test parameters
+PYQ Test: Previous year questions only
+Complete the test and review your performance
+
+4. Viewing Analytics
+Check "Analytics" section for detailed performance insights
+View charts for subject-wise performance, progress tracking, and time analysis
+📚 Supported Question Formats
+The PDF extraction system supports multiple question formats:
+
+Code
+Format 1: Q1. Question text? A) option B) option C) option D) option
+Format 2: Question 1: Question text? A) option B) option C) option D) option  
+Format 3: 1. Question text? (a) option (b) option (c) option (d) option
+🎨 Subjects Covered
+Mathematics (Algebra, Geometry, Arithmetic)
+General Intelligence & Reasoning (Coding, Series, Logic)
+Basic Science & Engineering (Physics, Electronics, Electrical)
+General Awareness (Current Affairs, History, Geography)
+Computer Applications (MS Office, Basic Programming)
+🔧 Configuration
+Test Settings
+Question Count: 10-100 questions
+Time Duration: 10-90 minutes
+Subject Distribution: Customizable per subject
+Difficulty Levels: Easy, Medium, Hard
+PDF Upload Settings
+File Size Limit: 50MB
+Supported Format: PDF only
+Extraction Methods: Multiple parsing strategies
+Validation: Automatic quality checks
+📱 Browser Compatibility
+Browser	Version	Status
+Chrome	80+	✅ Full Support
+Firefox	75+	✅ Full Support
+Safari	13+	✅ Full Support
+Edge	80+	✅ Full Support
+🤝 Contributing
+Fork the repository
+Create a feature branch (git checkout -b feature/amazing-feature)
+Commit your changes (git commit -m 'Add some amazing feature')
+Push to the branch (git push origin feature/amazing-feature)
+Open a Pull Request
+📝 License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+🐛 Known Issues & Limitations
+PDF extraction works best with well-formatted documents
+Data is stored locally in browser (consider regular backups)
+No server-side functionality (purely client-side)
+🔮 Roadmap
+ Question import/export functionality
+ Better PDF format support
+ Offline capability with service workers
+ Advanced question categorization
+ Performance comparison features
+ Mobile app version
+📞 Support
+If you encounter any issues or have questions:
+
+Check the Issues page
+Create a new issue with detailed description
+Include browser information and steps to reproduce
+🙏 Acknowledgments
+PDF.js team for excellent PDF processing library
+Chart.js team for beautiful chart components
+RRB exam preparation community for feedback and testing
+Happy Learning! 🎓
+
+Made with ❤️ for RRB Technician Grade-3 Signal aspirants
+
+Code
+
+### 2. .gitignore
+
+```gitignore name=.gitignore
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build outputs
+dist/
+build/
+
+# Backup files
+*.bak
+*.backup
