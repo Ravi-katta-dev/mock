@@ -1,4 +1,3 @@
-# mock
 # RRB Technician Grade-3 Signal Mock Test App
 
 A comprehensive web-based mock test application with PDF question extraction capabilities for RRB Technician Grade-3 Signal exam preparation.
@@ -36,16 +35,6 @@ A comprehensive web-based mock test application with PDF question extraction cap
 1. Clone or download this repository
 2. Open `index.html` in any modern web browser
 3. Start using the app immediately!
-
-### Option 2: Live Server (Recommended for development)
-```bash
-# Clone the repository
-git clone https://github.com/Ravi-katta-dev/mock-test-app.git
-cd mock-test-app
-
-# If using VS Code with Live Server extension
-# Right-click index.html → "Open with Live Server"
-
 
 🎯 Quick Start Guide
 1. First Time Setup
@@ -210,3 +199,14 @@ build/
 # Backup files
 *.bak
 *.backup
+
+### Option 2: Live Server (Recommended for development)
+```bash
+# Clone the repository
+git clone https://github.com/Ravi-katta-dev/mock-test-app.git
+cd mock-test-app
+
+# If using VS Code with Live Server extension
+# Right-click index.html → "Open with Live Server"
+
+
