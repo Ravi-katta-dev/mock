@@ -2925,7 +2925,7 @@ class MockTestApp {
             // Enhanced text preprocessing
             const preprocessedText = this.preprocessPDFText(fullText);
             
-            this.updateProcessingStep('Extracting questions using multiple strategies...');
+            this.updateProcessingStep('🔍 Extracting questions using enhanced strategies (layout-aware, table detection, multi-column support)...');
             this.updateProgress(75, 'Question extraction in progress');
             
             // Multiple extraction strategies
