@@ -29,6 +29,27 @@ A comprehensive web-based mock test application with PDF question extraction cap
 - **Storage**: localStorage (client-side)
 - **Design**: Responsive, mobile-friendly interface
 
+## 📁 Project Structure
+
+```
+mock/
+├── index.html                 # Main application entry point
+├── style.css                  # Application styles and themes
+├── app.js                     # Main application logic
+├── js/                        # JavaScript modules
+│   └── config/                # Configuration modules
+│       ├── constants.js       # App constants and configuration
+│       ├── syllabusMapping.js # RRB syllabus mapping and keywords
+│       └── examPatterns.js    # CBT exam patterns and test generation
+└── README.md                  # Project documentation
+```
+
+### Configuration Modules
+
+- **`constants.js`**: Application-wide constants, scoring configuration, UI settings, and error messages
+- **`syllabusMapping.js`**: Comprehensive RRB Technician Grade-3 Signal syllabus mapping with chapter keywords for intelligent question categorization
+- **`examPatterns.js`**: CBT exam patterns, test generation config, and pattern utilities for full mock test support
+
 ## 📦 Installation
 
 ### Option 1: Direct Download
