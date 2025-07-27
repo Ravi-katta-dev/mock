@@ -3658,6 +3658,9 @@ D) 6</pre>
             
             row.innerHTML = `
                 <td>
+                    <input type="checkbox" class="question-checkbox" value="${validatedQuestion.id}" onchange="app.updateDeleteButton()">
+                </td>
+                <td>
                     <div class="question-preview">
                         <span class="question-number">${index + 1}.</span>
                         ${validatedQuestion.text.substring(0, 100)}${validatedQuestion.text.length > 100 ? '...' : ''}
@@ -4186,6 +4189,74 @@ D) 6</pre>
             this.renderQuestionBank();
             this.updateDashboard();
             alert('🗑️ Question deleted successfully');
+        }
+    }
+
+    // Bulk delete functionality
+    toggleSelectAll() {
+        const selectAllCheckbox = document.getElementById('selectAllQuestions');
+        const questionCheckboxes = document.querySelectorAll('.question-checkbox');
+        
+        questionCheckboxes.forEach(checkbox => {
+            checkbox.checked = selectAllCheckbox.checked;
+        });
+        
+        this.updateDeleteButton();
+    }
+
+    updateDeleteButton() {
+        const checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
+        const deleteButton = document.getElementById('deleteSelectedBtn');
+        const selectAllCheckbox = document.getElementById('selectAllQuestions');
+        const allCheckboxes = document.querySelectorAll('.question-checkbox');
+        
+        if (deleteButton) {
+            deleteButton.disabled = checkedBoxes.length === 0;
+            deleteButton.textContent = checkedBoxes.length === 0 ? 
+                '🗑️ Delete Selected' : 
+                `🗑️ Delete Selected (${checkedBoxes.length})`;
+        }
+        
+        // Update select all checkbox state
+        if (selectAllCheckbox && allCheckboxes.length > 0) {
+            if (checkedBoxes.length === 0) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = false;
+            } else if (checkedBoxes.length === allCheckboxes.length) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.indeterminate = true;
+                selectAllCheckbox.checked = false;
+            }
+        }
+    }
+
+    deleteSelectedQuestions() {
+        const checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
+        const selectedIds = Array.from(checkedBoxes).map(checkbox => checkbox.value);
+        
+        if (selectedIds.length === 0) {
+            alert('Please select at least one question to delete.');
+            return;
+        }
+        
+        const confirmMessage = `Are you sure you want to delete ${selectedIds.length} selected question(s)?\n\nThis action cannot be undone.`;
+        
+        if (confirm(confirmMessage)) {
+            this.questions = this.questions.filter(q => !selectedIds.includes(q.id));
+            this.saveQuestions();
+            this.renderQuestionBank();
+            this.updateDashboard();
+            
+            // Reset select all checkbox
+            const selectAllCheckbox = document.getElementById('selectAllQuestions');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+            
+            alert(`🗑️ Successfully deleted ${selectedIds.length} question(s)`);
         }
     }
 
