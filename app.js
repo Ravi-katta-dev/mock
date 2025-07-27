@@ -1440,10 +1440,43 @@ class MockTestApp {
         return solutionsPatterns.some(pattern => pattern.test(content));
     }
 
-    // Enhanced answer key auto-detection and parsing
+    // Enhanced answer key auto-detection and parsing with multi-strategy approach
     autoDetectAndParseAnswerKeys(text, extractedQuestions) {
-        console.log('🔍 Auto-detecting answer keys from PDF content...');
+        console.log('🔍 Auto-detecting answer keys from PDF content using enhanced multi-strategy approach...');
         
+        try {
+            // Use the enhanced multi-strategy detection
+            const result = this.detectAnswersWithMultipleStrategies(text, extractedQuestions);
+            
+            if (result.success) {
+                console.log(`✅ Enhanced answer key detection successful!`);
+                console.log(`   • Applied answers: ${result.appliedAnswers}`);
+                console.log(`   • Detection method: ${result.format}`);
+                console.log(`   • Confidence: ${result.confidence}%`);
+                
+                if (result.conflicts && result.conflicts > 0) {
+                    console.log(`   • Conflicts resolved: ${result.conflicts}`);
+                }
+                
+                return result;
+            } else {
+                console.log('❌ Enhanced answer key detection failed - trying fallback method');
+                
+                // Fallback to original method for backward compatibility
+                return this.detectAnswersWithOriginalMethod(text, extractedQuestions);
+            }
+
+        } catch (error) {
+            console.error('Error in enhanced answer key auto-detection:', error);
+            console.log('⚠️ Falling back to original detection method...');
+            
+            // Fallback to original method
+            return this.detectAnswersWithOriginalMethod(text, extractedQuestions);
+        }
+    }
+
+    // Original detection method as fallback
+    detectAnswersWithOriginalMethod(text, extractedQuestions) {
         const answerKeyData = {
             detected: false,
             answers: {},
@@ -1454,7 +1487,7 @@ class MockTestApp {
         };
 
         try {
-            // Multiple answer key detection strategies
+            // Original simple strategy selection
             const strategies = [
                 this.detectGridAnswerKey.bind(this),
                 this.detectListAnswerKey.bind(this),
@@ -1471,16 +1504,16 @@ class MockTestApp {
 
             // Apply detected answers to questions if confidence is high enough
             if (answerKeyData.detected && answerKeyData.confidence > 60) {
-                console.log(`✅ Answer key detected with ${answerKeyData.confidence}% confidence (${answerKeyData.format} format)`);
+                console.log(`✅ Fallback answer key detected with ${answerKeyData.confidence}% confidence (${answerKeyData.format} format)`);
                 this.applyAnswerKeyToQuestions(extractedQuestions, answerKeyData.answers);
                 return { success: true, appliedAnswers: Object.keys(answerKeyData.answers).length, ...answerKeyData };
             } else {
-                console.log('❌ No reliable answer key detected');
+                console.log('❌ No reliable answer key detected with fallback method');
                 return { success: false, reason: 'Low confidence or no answer key found' };
             }
 
         } catch (error) {
-            console.error('Error in answer key auto-detection:', error);
+            console.error('Error in fallback answer key detection:', error);
             return { success: false, reason: 'Error during detection', error: error.message };
         }
     }
@@ -1521,127 +1554,850 @@ class MockTestApp {
         return result;
     }
 
-    // Strategy 2: List format answer key
+    // Strategy 2: Enhanced List format answer key detection with better patterns
     detectListAnswerKey(text) {
         const result = { detected: false, answers: {}, confidence: 0, format: 'list' };
         
-        // Pattern: 1. A, 2. B, 3. C (sequential list)
+        // Enhanced patterns for list format detection including more variations
         const listPatterns = [
+            // Standard patterns
             /(\d+)\s*[.\-:]\s*([A-D])/g,
             /(\d+)\s*[.\-:]\s*\(([A-D])\)/g,
-            /(\d+)\s*[.\-:]\s*([A-D])\s*(?:,|;|\n|$)/g
+            /(\d+)\s*[.\-:]\s*([A-D])\s*(?:,|;|\n|$)/g,
+            
+            // Additional patterns for better coverage
+            /^\s*(\d+)[\s\.]\s*([A-D])\s*$/gm,  // Simple number-answer format
+            /(\d+)\s*\)\s*([A-D])/g,  // Number with closing parenthesis
+            /(\d+)\s*\.?\s*([A-D])(?=\s|$)/g,  // Flexible dot pattern
+            
+            // Answer format variations
+            /Answer\s*(\d+)\s*[:\-]\s*([A-D])/gi,
+            /Q\.?\s*(\d+)\s*:\s*([A-D])/gi,
+            
+            // Spaced out lists
+            /(\d+)\s{2,}([A-D])/g
+        ];
+
+        let totalMatches = 0;
+        let consecutiveCount = 0;
+        let lastQuestionNum = 0;
+        let bestPatternResult = {};
+
+        listPatterns.forEach((pattern, patternIndex) => {
+            const tempAnswers = {};
+            let patternMatches = 0;
+            let patternConsecutive = 0;
+            let lastNum = 0;
+            
+            pattern.lastIndex = 0;
+            let match;
+            
+            while ((match = pattern.exec(text)) !== null) {
+                const qNum = parseInt(match[1]);
+                const answer = match[2].toUpperCase();
+                
+                if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
+                    // Check context to avoid false positives
+                    const context = text.substring(Math.max(0, match.index - 30), match.index + 50);
+                    if (this.isLikelyAnswerKeyContext(context, match[0])) {
+                        tempAnswers[qNum] = this.answerLetterToIndex(answer);
+                        patternMatches++;
+                        
+                        if (qNum === lastNum + 1) {
+                            patternConsecutive++;
+                        }
+                        lastNum = qNum;
+                    }
+                }
+            }
+            
+            // Use this pattern if it's better than previous ones
+            if (patternMatches > totalMatches || 
+                (patternMatches === totalMatches && patternConsecutive > consecutiveCount)) {
+                result.answers = { ...tempAnswers };
+                totalMatches = patternMatches;
+                consecutiveCount = patternConsecutive;
+                lastQuestionNum = lastNum;
+            }
+        });
+
+        // Lower threshold for detection with enhanced scoring
+        if (totalMatches >= 3) {  // Reduced from 15 to 3
+            result.detected = true;
+            let baseConfidence = 45 + (totalMatches * 5);
+            
+            // Bonus for consecutive questions (indicates proper answer key)
+            if (consecutiveCount >= 3) {
+                baseConfidence += 25;
+            }
+            
+            // Bonus for many matches
+            if (totalMatches >= 10) {
+                baseConfidence += 15;
+            }
+            
+            result.confidence = Math.min(95, baseConfidence);
+        }
+
+        return result;
+    }
+
+    // Strategy 3: Enhanced Table format answer key detection
+    detectTableAnswerKey(text) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'table' };
+        
+        // Enhanced patterns for table format detection
+        const tablePatterns = [
+            // Traditional table patterns with separators
+            /Q\.?\s*No\.?\s*[|\t]\s*Answer[\s\S]*?(\d+)\s*[|\t]\s*([A-D])/gi,
+            /Question\s*[|\t]\s*Answer[\s\S]*?(\d+)\s*[|\t]\s*([A-D])/gi,
+            
+            // Pipe-separated tables
+            /(\d+)\s*\|\s*([A-D])/gi,
+            
+            // Tab-separated tables  
+            /(\d+)\s*\t+\s*([A-D])/gi,
+            
+            // Space-aligned tables (common in plain text)
+            /^\s*(\d+)\s{2,}([A-D])\s*$/gm,
+            
+            // Table with dashes/headers
+            /^\s*(\d+)\s*[-|]\s*([A-D])\s*$/gm,
+            
+            // Table rows after header detection
+            /(?:Q\.?\s*No\.?|Question|Ans|Answer)[\s\S]*?^\s*(\d+)\s+([A-D])\s*$/gm
         ];
 
         let totalMatches = 0;
         let consecutiveCount = 0;
         let lastQuestionNum = 0;
 
-        listPatterns.forEach(pattern => {
+        tablePatterns.forEach((pattern, patternIndex) => {
+            const tempAnswers = {};
+            let patternMatches = 0;
             let match;
+            
+            // Reset regex lastIndex for each pattern
+            pattern.lastIndex = 0;
+            
             while ((match = pattern.exec(text)) !== null) {
                 const qNum = parseInt(match[1]);
                 const answer = match[2].toUpperCase();
                 
                 if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
-                    result.answers[qNum] = this.answerLetterToIndex(answer);
-                    totalMatches++;
+                    // Check for potential false positives (like question numbers in question text)
+                    const matchContext = text.substring(Math.max(0, match.index - 50), match.index + 50);
                     
-                    // Check for consecutive numbering (indicates proper answer key)
+                    // Skip if this looks like part of a question rather than answer key
+                    if (!this.isLikelyAnswerKeyContext(matchContext, match[0])) {
+                        continue;
+                    }
+                    
+                    tempAnswers[qNum] = this.answerLetterToIndex(answer);
+                    patternMatches++;
+                    
+                    // Check for consecutive numbering
                     if (qNum === lastQuestionNum + 1) {
                         consecutiveCount++;
                     }
                     lastQuestionNum = qNum;
                 }
             }
+            
+            // Use this pattern's results if it found more matches
+            if (patternMatches > totalMatches) {
+                result.answers = { ...tempAnswers };
+                totalMatches = patternMatches;
+            }
         });
 
-        if (totalMatches > 15 && consecutiveCount > 10) {
+        // Lower threshold for table detection and add consecutive bonus
+        if (totalMatches >= 3) {
             result.detected = true;
-            result.confidence = Math.min(95, 70 + consecutiveCount);
+            let baseConfidence = 40 + (totalMatches * 8);
+            
+            // Bonus for consecutive questions (indicates proper answer key)
+            if (consecutiveCount >= 3) {
+                baseConfidence += 20;
+            }
+            
+            result.confidence = Math.min(95, baseConfidence);
         }
 
         return result;
     }
 
-    // Strategy 3: Table format answer key
-    detectTableAnswerKey(text) {
-        const result = { detected: false, answers: {}, confidence: 0, format: 'table' };
+    // Helper method to validate answer key context
+    isLikelyAnswerKeyContext(context, match) {
+        const lowerContext = context.toLowerCase();
         
-        // Pattern: Table with Q.No | Answer columns
-        const tablePatterns = [
-            /Q\.?\s*No\.?\s*[|\t]\s*Answer[\s\S]*?(\d+)\s*[|\t]\s*([A-D])/gi,
-            /Question\s*[|\t]\s*Answer[\s\S]*?(\d+)\s*[|\t]\s*([A-D])/gi
+        // Positive indicators for answer key context
+        const positiveIndicators = [
+            'answer', 'key', 'solution', 'correct', 'ans', 'response',
+            '|', '\t', 'q.no', 'question', 'qno'
+        ];
+        
+        // Negative indicators (suggests it's part of question text)
+        const negativeIndicators = [
+            'what is', 'which of', 'find', 'calculate', 'if', 'then',
+            'options:', 'a)', 'b)', 'c)', 'd)', 'choose', 'select'
+        ];
+        
+        let positiveScore = 0;
+        let negativeScore = 0;
+        
+        positiveIndicators.forEach(indicator => {
+            if (lowerContext.includes(indicator)) {
+                positiveScore++;
+            }
+        });
+        
+        negativeIndicators.forEach(indicator => {
+            if (lowerContext.includes(indicator)) {
+                negativeScore++;
+            }
+        });
+        
+        // Also check if the match is at the beginning of a line (common in tables)
+        const isLineStart = /^\s*\d+\s*[|\t-]?\s*[A-D]/.test(match);
+        if (isLineStart) {
+            positiveScore += 2;
+        }
+        
+        return positiveScore > negativeScore;
+    }
+
+    // Strategy 4: Enhanced Inline and Mixed format answer key detection
+    detectInlineAnswerKey(text) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'inline' };
+        
+        // Enhanced patterns for mixed and inline formats
+        const mixedPatterns = [
+            // Traditional inline patterns
+            /(?:Answer|Ans|Correct)\s*[:\-]\s*([A-D])/gi,
+            /\(Correct\s*[:\-]\s*([A-D])\)/gi,
+            
+            // Mixed format patterns (from test case)
+            /Questions?\s+(\d+)-(\d+):\s*([A-D\s]+)/gi,  // "Questions 1-10: A B C D A"
+            /Q(\d+):\s*([A-D])/gi,  // "Q11: C"
+            /(\d+)\.([A-D])\s+(\d+)\.([A-D])/gi,  // "16.A 17.B"
+            
+            // Compact answer sequences
+            /(\d+)\s*[:\-\.]\s*([A-D])(?:\s*,\s*(\d+)\s*[:\-\.]\s*([A-D]))*+/gi,
+            
+            // Answer lines with ranges
+            /(\d+)\s*-\s*(\d+)\s*:\s*([A-D\s]+)/gi,  // "1-10: A B C D A B C D A B"
+            
+            // Single line answer keys
+            /(?:Answer\s+Key|Answers)\s*:?\s*((?:\d+\s*[:\-\.]\s*[A-D]\s*[,;]?\s*)+)/gi
         ];
 
         let totalMatches = 0;
-        tablePatterns.forEach(pattern => {
+        let questionSpecificMatches = 0;
+
+        mixedPatterns.forEach((pattern, patternIndex) => {
             let match;
+            pattern.lastIndex = 0;
+            
             while ((match = pattern.exec(text)) !== null) {
+                if (patternIndex === 2) {
+                    // Handle range pattern: "Questions 1-10: A B C D A"
+                    const startQ = parseInt(match[1]);
+                    const endQ = parseInt(match[2]);
+                    const answers = match[3].replace(/\s+/g, ' ').trim().split(/\s+/);
+                    
+                    let qNum = startQ;
+                    answers.forEach(answer => {
+                        if (qNum <= endQ && ['A', 'B', 'C', 'D'].includes(answer.toUpperCase())) {
+                            result.answers[qNum] = this.answerLetterToIndex(answer.toUpperCase());
+                            totalMatches++;
+                            questionSpecificMatches++;
+                            qNum++;
+                        }
+                    });
+                } else if (patternIndex === 3) {
+                    // Handle "Q11: C" pattern
+                    const qNum = parseInt(match[1]);
+                    const answer = match[2].toUpperCase();
+                    
+                    if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
+                        result.answers[qNum] = this.answerLetterToIndex(answer);
+                        totalMatches++;
+                        questionSpecificMatches++;
+                    }
+                } else if (patternIndex === 4) {
+                    // Handle "16.A 17.B" pattern
+                    const qNum1 = parseInt(match[1]);
+                    const answer1 = match[2].toUpperCase();
+                    const qNum2 = parseInt(match[3]);
+                    const answer2 = match[4].toUpperCase();
+                    
+                    if (qNum1 >= 1 && qNum1 <= 200 && ['A', 'B', 'C', 'D'].includes(answer1)) {
+                        result.answers[qNum1] = this.answerLetterToIndex(answer1);
+                        totalMatches++;
+                        questionSpecificMatches++;
+                    }
+                    
+                    if (qNum2 >= 1 && qNum2 <= 200 && ['A', 'B', 'C', 'D'].includes(answer2)) {
+                        result.answers[qNum2] = this.answerLetterToIndex(answer2);
+                        totalMatches++;
+                        questionSpecificMatches++;
+                    }
+                } else if (patternIndex === 6) {
+                    // Handle range with answers: "1-10: A B C D A B C D A B"
+                    const startQ = parseInt(match[1]);
+                    const endQ = parseInt(match[2]);
+                    const answers = match[3].replace(/\s+/g, ' ').trim().split(/\s+/);
+                    
+                    let qNum = startQ;
+                    answers.forEach(answer => {
+                        if (qNum <= endQ && ['A', 'B', 'C', 'D'].includes(answer.toUpperCase())) {
+                            result.answers[qNum] = this.answerLetterToIndex(answer.toUpperCase());
+                            totalMatches++;
+                            questionSpecificMatches++;
+                            qNum++;
+                        }
+                    });
+                } else {
+                    // Handle simple patterns
+                    const answer = (match[1] || match[2]).toUpperCase();
+                    if (['A', 'B', 'C', 'D'].includes(answer)) {
+                        totalMatches++;
+                    }
+                }
+            }
+        });
+
+        // Enhanced detection logic for mixed formats
+        if (questionSpecificMatches >= 5 || totalMatches >= 15) {
+            result.detected = true;
+            
+            // Calculate confidence based on question-specific matches
+            let baseConfidence = 30;
+            if (questionSpecificMatches >= 10) {
+                baseConfidence = 70;
+            } else if (questionSpecificMatches >= 5) {
+                baseConfidence = 55;
+            }
+            
+            result.confidence = Math.min(85, baseConfidence + (questionSpecificMatches * 2));
+            result.questionSpecificMatches = questionSpecificMatches;
+        }
+
+        return result;
+    }
+
+    // Strategy 5: Enhanced Pattern-based answer detection (circles, checkmarks, bold text)
+    detectPatternBasedAnswers(text) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'pattern' };
+        
+        // Detect various answer marking patterns with enhanced recognition
+        const patternTypes = [
+            // Filled circles or bullets
+            { pattern: /(\d+)\.?\s*[●○▪▫•]\s*([A-D])/g, name: 'bullet', weight: 1.2 },
+            
+            // Checkmarks or X marks
+            { pattern: /(\d+)\.?\s*[✓✗×]\s*([A-D])/g, name: 'checkmark', weight: 1.3 },
+            
+            // Bold or emphasized text (common patterns)
+            { pattern: /(\d+)\.?\s*\*([A-D])\*/g, name: 'bold', weight: 1.1 },
+            
+            // Underlined answers
+            { pattern: /(\d+)\.?\s*_([A-D])_/g, name: 'underline', weight: 1.1 },
+            
+            // Bracketed answers (enhanced pattern)
+            { pattern: /(\d+)\.?\s*\[([A-D])\]/g, name: 'bracket', weight: 1.2 },
+            
+            // Highlighted patterns (common text representations)
+            { pattern: /(\d+)\.?\s*>([A-D])</g, name: 'highlight', weight: 1.2 },
+            
+            // Answer with special markers (enhanced)
+            { pattern: /(\d+)\.?\s*(?:ANS|ANSWER):\s*([A-D])/gi, name: 'answer_marker', weight: 1.5 },
+            
+            // Enhanced bullet patterns
+            { pattern: /(\d+)\.\s*●([A-D])/g, name: 'dot_bullet', weight: 1.3 }
+        ];
+
+        let totalMatches = 0;
+        let weightedScore = 0;
+        let bestPatternName = '';
+        const detectedPatterns = {};
+
+        patternTypes.forEach(patternType => {
+            let patternMatches = 0;
+            let match;
+            
+            patternType.pattern.lastIndex = 0;
+            
+            while ((match = patternType.pattern.exec(text)) !== null) {
                 const qNum = parseInt(match[1]);
                 const answer = match[2].toUpperCase();
                 
                 if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
-                    result.answers[qNum] = this.answerLetterToIndex(answer);
-                    totalMatches++;
+                    // Enhanced context checking for pattern-based answers
+                    const context = text.substring(Math.max(0, match.index - 40), match.index + 40);
+                    if (this.isLikelyAnswerPattern(context, match[0])) {
+                        // Avoid duplicates by checking if we already have this question
+                        if (!result.answers[qNum] || weightedScore < patternType.weight) {
+                            result.answers[qNum] = this.answerLetterToIndex(answer);
+                        }
+                        patternMatches++;
+                        totalMatches++;
+                        weightedScore += patternType.weight;
+                        
+                        if (!detectedPatterns[patternType.name]) {
+                            detectedPatterns[patternType.name] = 0;
+                        }
+                        detectedPatterns[patternType.name]++;
+                        
+                        if (patternMatches > 0) {
+                            bestPatternName = patternType.name;
+                        }
+                    }
                 }
             }
         });
 
-        if (totalMatches > 8) {
+        // Enhanced detection logic with pattern diversity bonus
+        if (totalMatches >= 3) {  // Reduced threshold
             result.detected = true;
-            result.confidence = Math.min(85, 50 + (totalMatches * 3));
+            
+            // Base confidence from matches and weighted score
+            let confidence = Math.min(90, 45 + (weightedScore * 6));
+            
+            // Bonus for pattern diversity (multiple pattern types found)
+            const patternTypes = Object.keys(detectedPatterns).length;
+            if (patternTypes > 1) {
+                confidence += (patternTypes - 1) * 5;
+            }
+            
+            // Bonus for high-value patterns (answer_marker, bracket)
+            if (detectedPatterns['answer_marker'] || detectedPatterns['bracket']) {
+                confidence += 10;
+            }
+            
+            result.confidence = Math.min(95, confidence);
+            result.patternType = bestPatternName;
+            result.totalMatches = totalMatches;
+            result.patternDiversity = patternTypes;
         }
 
         return result;
     }
 
-    // Strategy 4: Inline answer key (answers within question text)
-    detectInlineAnswerKey(text) {
-        const result = { detected: false, answers: {}, confidence: 0, format: 'inline' };
+    // Strategy 6: Contextual answer detection
+    detectContextualAnswers(text, questions = []) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'contextual' };
         
-        // Pattern: Answer: A or Ans: B within text
-        const inlinePatterns = [
-            /(?:Answer|Ans|Correct)\s*[:\-]\s*([A-D])/gi,
-            /\(Correct\s*[:\-]\s*([A-D])\)/gi
-        ];
+        // Look for answer patterns in context of actual questions
+        if (questions.length === 0) {
+            return result;
+        }
 
-        // This strategy has lower confidence as it might pick up explanations
-        let totalMatches = 0;
-        inlinePatterns.forEach(pattern => {
-            let match;
-            while ((match = pattern.exec(text)) !== null) {
-                const answer = match[1].toUpperCase();
-                if (['A', 'B', 'C', 'D'].includes(answer)) {
-                    totalMatches++;
+        let contextualMatches = 0;
+        const textLines = text.split('\n');
+        
+        questions.forEach(question => {
+            const qNum = question.questionNumber || question.number;
+            if (!qNum) return;
+            
+            // Find lines that contain this question number
+            const relevantLines = textLines.filter(line => {
+                const cleanLine = line.trim().toLowerCase();
+                return cleanLine.includes(qNum.toString()) && 
+                       (cleanLine.includes('answer') || cleanLine.includes('correct') || 
+                        cleanLine.includes('solution') || /[A-D]/.test(line));
+            });
+            
+            relevantLines.forEach(line => {
+                // Extract answer from contextual line
+                const contextualAnswer = this.extractAnswerFromContextualLine(line, qNum);
+                if (contextualAnswer !== null) {
+                    result.answers[qNum] = contextualAnswer;
+                    contextualMatches++;
                 }
-            }
+            });
         });
 
-        if (totalMatches > 20) {
+        if (contextualMatches >= 3) {
             result.detected = true;
-            result.confidence = Math.min(60, 30 + totalMatches); // Lower confidence for inline
+            result.confidence = Math.min(80, 40 + (contextualMatches * 10));
+            result.contextualMatches = contextualMatches;
         }
 
         return result;
     }
 
-    // Apply detected answer key to questions
+    // Helper method to validate answer patterns
+    isLikelyAnswerPattern(context, match) {
+        const lowerContext = context.toLowerCase();
+        
+        // Positive indicators
+        const positiveIndicators = [
+            'answer', 'correct', 'solution', 'key', 'response'
+        ];
+        
+        // Negative indicators (suggests it's part of question)
+        const negativeIndicators = [
+            'question', 'if', 'what', 'which', 'how', 'find', 'calculate'
+        ];
+        
+        let score = 0;
+        positiveIndicators.forEach(indicator => {
+            if (lowerContext.includes(indicator)) score += 2;
+        });
+        
+        negativeIndicators.forEach(indicator => {
+            if (lowerContext.includes(indicator)) score -= 1;
+        });
+        
+        return score > 0;
+    }
+
+    // Extract answer from contextual line
+    extractAnswerFromContextualLine(line, questionNumber) {
+        // Try different patterns to extract answer for specific question
+        const patterns = [
+            new RegExp(questionNumber + '\\s*[:\\-.]\\s*([A-D])', 'i'),
+            new RegExp('Q\\.?\\s*' + questionNumber + '\\s*[:\\-.]\\s*([A-D])', 'i'),
+            new RegExp(questionNumber + '\\s*\\)\\s*([A-D])', 'i'),
+            new RegExp('(' + questionNumber + ').*?([A-D])(?=\\s|$)', 'i')
+        ];
+        
+        for (const pattern of patterns) {
+            const match = line.match(pattern);
+            if (match && match.length >= 2) {
+                const answer = match[match.length - 1].toUpperCase();
+                if (['A', 'B', 'C', 'D'].includes(answer)) {
+                    return this.answerLetterToIndex(answer);
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    // Apply detected answer key to questions with enhanced validation
     applyAnswerKeyToQuestions(questions, answerKey) {
         let appliedCount = 0;
+        let validatedCount = 0;
         
         questions.forEach(question => {
             const qNum = question.questionNumber || question.number;
             if (qNum && answerKey[qNum] !== undefined) {
-                question.correctAnswer = answerKey[qNum];
-                question.explanation = question.explanation || `Answer detected from PDF answer key: Option ${String.fromCharCode(65 + answerKey[qNum])}`;
-                question.answerSource = 'auto-detected';
-                question.needsReview = false; // Mark as reviewed since we have the answer
-                appliedCount++;
+                // Contextual validation before applying answer
+                if (this.validateAnswerContextually(question, answerKey[qNum])) {
+                    question.correctAnswer = answerKey[qNum];
+                    question.explanation = question.explanation || `Answer detected from PDF answer key: Option ${String.fromCharCode(65 + answerKey[qNum])}`;
+                    question.answerSource = 'auto-detected';
+                    question.needsReview = false;
+                    appliedCount++;
+                    validatedCount++;
+                } else {
+                    // Apply but mark for review if validation fails
+                    question.correctAnswer = answerKey[qNum];
+                    question.suggestedAnswer = answerKey[qNum];
+                    question.answerSource = 'auto-detected-needs-review';
+                    question.needsReview = true;
+                    question.reviewReason = 'Answer key detected but failed contextual validation';
+                    appliedCount++;
+                }
             }
         });
 
-        console.log(`✅ Applied answers to ${appliedCount} questions from answer key`);
+        console.log(`✅ Applied answers to ${appliedCount} questions (${validatedCount} validated, ${appliedCount - validatedCount} need review)`);
         return appliedCount;
+    }
+
+    // Enhanced contextual validation for detected answers
+    validateAnswerContextually(question, detectedAnswer) {
+        if (!question.options || question.options.length !== 4) {
+            return false;
+        }
+
+        const questionText = question.text.toLowerCase();
+        const selectedOption = question.options[detectedAnswer];
+        
+        if (!selectedOption) {
+            return false;
+        }
+
+        const selectedOptionText = selectedOption.toLowerCase();
+
+        // Check for obvious mismatches
+        const obviousIncorrectPatterns = [
+            // If question asks for "not" or "except" and answer seems too positive
+            /(?:not|except|incorrect|false|wrong).*(?:is|are|will)/,
+            // Mathematical validation
+            /calculate|find.*value|what.*result/
+        ];
+
+        // Basic semantic validation
+        let validationScore = 0;
+
+        // Mathematical question validation
+        if (this.isMathematicalQuestion(questionText)) {
+            // For math questions, we trust the answer key more
+            validationScore += 2;
+        }
+
+        // Reasoning question validation  
+        if (this.isReasoningQuestion(questionText)) {
+            // For reasoning, check if answer follows logical patterns
+            if (this.validateReasoningAnswer(questionText, selectedOptionText)) {
+                validationScore += 1;
+            }
+        }
+
+        // General awareness validation
+        if (this.isGeneralAwarenessQuestion(questionText)) {
+            // For GK, answers are usually factual
+            validationScore += 1;
+        }
+
+        // Check for contradiction indicators
+        if (this.hasContradictionIndicators(questionText, selectedOptionText)) {
+            validationScore -= 2;
+        }
+
+        // Require positive validation score
+        return validationScore >= 0;
+    }
+
+    // Helper methods for contextual validation
+    isMathematicalQuestion(questionText) {
+        const mathKeywords = [
+            'calculate', 'find', 'solve', 'value', 'equation', 'formula',
+            'percentage', 'ratio', 'proportion', 'area', 'volume', 'speed',
+            'time', 'distance', 'profit', 'loss', 'interest', 'compound',
+            '+', '-', '×', '÷', '=', '%', '²', '³', 'square', 'cube'
+        ];
+        
+        return mathKeywords.some(keyword => questionText.includes(keyword));
+    }
+
+    isReasoningQuestion(questionText) {
+        const reasoningKeywords = [
+            'series', 'sequence', 'pattern', 'analogy', 'relation', 'code',
+            'logic', 'reasoning', 'similar', 'different', 'odd one out',
+            'direction', 'arrangement', 'conclusion', 'assumption'
+        ];
+        
+        return reasoningKeywords.some(keyword => questionText.includes(keyword));
+    }
+
+    isGeneralAwarenessQuestion(questionText) {
+        const gaKeywords = [
+            'capital', 'president', 'minister', 'government', 'country',
+            'state', 'river', 'mountain', 'author', 'book', 'award',
+            'currency', 'festival', 'committee', 'organization', 'founded'
+        ];
+        
+        return gaKeywords.some(keyword => questionText.includes(keyword));
+    }
+
+    validateReasoningAnswer(questionText, answerText) {
+        // Basic validation for reasoning questions
+        // This is a simplified version - could be enhanced further
+        
+        if (questionText.includes('next') && questionText.includes('series')) {
+            // For series questions, answer should typically be numeric or follow pattern
+            return true; // Simplified - trust the pattern for now
+        }
+        
+        if (questionText.includes('analogy') || questionText.includes('similar')) {
+            // For analogy questions, validate relationship patterns
+            return true; // Simplified
+        }
+        
+        return true; // Default to trusting the answer key
+    }
+
+    hasContradictionIndicators(questionText, answerText) {
+        // Check for obvious contradictions
+        
+        // If question asks for "not" but answer seems affirmative
+        if (questionText.includes(' not ') || questionText.includes('except')) {
+            if (answerText.includes('yes') || answerText.includes('correct') || answerText.includes('true')) {
+                return true;
+            }
+        }
+        
+        // If question asks for "smallest" but answer contains "largest"
+        if (questionText.includes('smallest') || questionText.includes('minimum')) {
+            if (answerText.includes('largest') || answerText.includes('maximum')) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    // Enhanced multi-strategy detection with result combination
+    detectAnswersWithMultipleStrategies(text, extractedQuestions) {
+        console.log('🔍 Running enhanced multi-strategy answer detection...');
+        
+        const allResults = [];
+        
+        // Run all detection strategies with enhanced error handling
+        const strategies = [
+            { name: 'grid', method: this.detectGridAnswerKey.bind(this), priority: 3 },
+            { name: 'list', method: this.detectListAnswerKey.bind(this), priority: 4 },
+            { name: 'table', method: this.detectTableAnswerKey.bind(this), priority: 2 },
+            { name: 'inline', method: this.detectInlineAnswerKey.bind(this), priority: 5 },
+            { name: 'pattern', method: this.detectPatternBasedAnswers.bind(this), priority: 1 },
+            { name: 'contextual', method: this.detectContextualAnswers.bind(this), priority: 1, needsQuestions: true }
+        ];
+
+        strategies.forEach(strategy => {
+            try {
+                let result;
+                if (strategy.needsQuestions) {
+                    result = strategy.method(text, extractedQuestions);
+                } else {
+                    result = strategy.method(text);
+                }
+                
+                if (result.detected && Object.keys(result.answers).length > 0) {
+                    result.strategyName = strategy.name;
+                    result.priority = strategy.priority;
+                    allResults.push(result);
+                    console.log(`✅ ${strategy.name} strategy: ${Object.keys(result.answers).length} answers, ${result.confidence}% confidence`);
+                }
+            } catch (error) {
+                console.warn(`⚠️ ${strategy.name} strategy failed:`, error.message);
+            }
+        });
+
+        // Enhanced result combination with priority weighting
+        const combinedResult = this.enhancedCombineDetectionResults(allResults);
+        
+        if (combinedResult.detected) {
+            console.log(`🎯 Combined result: ${Object.keys(combinedResult.answers).length} answers, ${combinedResult.confidence}% confidence`);
+            this.applyAnswerKeyToQuestions(extractedQuestions, combinedResult.answers);
+            return { success: true, appliedAnswers: Object.keys(combinedResult.answers).length, ...combinedResult };
+        } else {
+            console.log('❌ No reliable answer patterns detected across all strategies');
+            return { success: false, reason: 'All strategies failed or low confidence' };
+        }
+    }
+
+    // Enhanced intelligent result combination algorithm with priority weighting
+    enhancedCombineDetectionResults(results) {
+        if (results.length === 0) {
+            return { detected: false, answers: {}, confidence: 0 };
+        }
+
+        if (results.length === 1) {
+            return results[0];
+        }
+
+        console.log('🔀 Combining results from multiple detection strategies with enhanced logic...');
+        
+        const combinedAnswers = {};
+        const answerSources = {};
+        const confidenceScores = {};
+
+        // Collect all answers with their sources, confidence, and priority
+        results.forEach(result => {
+            Object.keys(result.answers).forEach(qNum => {
+                const answer = result.answers[qNum];
+                
+                if (!combinedAnswers[qNum]) {
+                    combinedAnswers[qNum] = {};
+                    answerSources[qNum] = [];
+                }
+                
+                if (!combinedAnswers[qNum][answer]) {
+                    combinedAnswers[qNum][answer] = 0;
+                }
+                
+                // Enhanced weighting: confidence * priority * consistency bonus
+                const baseWeight = result.confidence / 100;
+                const priorityMultiplier = result.priority || 1;
+                const finalWeight = baseWeight * priorityMultiplier;
+                
+                combinedAnswers[qNum][answer] += finalWeight;
+                
+                answerSources[qNum].push({
+                    strategy: result.strategyName,
+                    answer: answer,
+                    confidence: result.confidence,
+                    priority: result.priority,
+                    weight: finalWeight
+                });
+            });
+        });
+
+        // Enhanced conflict resolution
+        const finalAnswers = {};
+        let totalConfidence = 0;
+        let answersWithConflicts = 0;
+        let answersResolved = 0;
+        let highConfidenceCount = 0;
+
+        Object.keys(combinedAnswers).forEach(qNum => {
+            const answerOptions = combinedAnswers[qNum];
+            const sortedAnswers = Object.keys(answerOptions).sort((a, b) => answerOptions[b] - answerOptions[a]);
+            
+            const bestAnswer = parseInt(sortedAnswers[0]);
+            const bestScore = answerOptions[bestAnswer];
+            const secondBestScore = answerOptions[sortedAnswers[1]] || 0;
+            
+            // Check for conflicts
+            if (secondBestScore > 0 && (bestScore - secondBestScore) < 0.5) {
+                answersWithConflicts++;
+                console.log(`⚠️ Conflict for Q${qNum}: ${sortedAnswers.map(a => `${String.fromCharCode(65 + parseInt(a))}(${answerOptions[a].toFixed(2)})`).join(' vs ')}`);
+            }
+            
+            // Enhanced threshold: lower minimum but require higher confidence for auto-acceptance
+            if (bestScore >= 0.3) {  // Lower minimum threshold
+                finalAnswers[qNum] = bestAnswer;
+                answersResolved++;
+                
+                // Calculate confidence for this answer with enhanced scoring
+                let questionConfidence = Math.min(95, (bestScore * 80) + (bestScore - secondBestScore) * 30);
+                
+                // Bonus for high-priority strategies
+                const highPrioritySource = answerSources[qNum].find(source => source.priority >= 4 && source.answer == bestAnswer);
+                if (highPrioritySource) {
+                    questionConfidence += 10;
+                }
+                
+                // Bonus for multiple strategy agreement
+                const agreementCount = answerSources[qNum].filter(source => source.answer == bestAnswer).length;
+                if (agreementCount > 1) {
+                    questionConfidence += (agreementCount - 1) * 5;
+                }
+                
+                confidenceScores[qNum] = questionConfidence;
+                totalConfidence += questionConfidence;
+                
+                if (questionConfidence >= 80) {
+                    highConfidenceCount++;
+                }
+            }
+        });
+
+        const avgConfidence = answersResolved > 0 ? totalConfidence / answersResolved : 0;
+        
+        console.log(`📊 Enhanced resolution summary:`);
+        console.log(`   • Total questions processed: ${Object.keys(combinedAnswers).length}`);
+        console.log(`   • Answers resolved: ${answersResolved}`);
+        console.log(`   • High confidence answers: ${highConfidenceCount}`);
+        console.log(`   • Conflicts detected: ${answersWithConflicts}`);
+        console.log(`   • Average confidence: ${avgConfidence.toFixed(1)}%`);
+
+        return {
+            detected: answersResolved >= 2,  // Reduced threshold
+            answers: finalAnswers,
+            confidence: avgConfidence,
+            format: 'combined',
+            conflicts: answersWithConflicts,
+            totalResolved: answersResolved,
+            highConfidenceCount: highConfidenceCount,
+            strategies: results.map(r => r.strategyName)
+        };
     }
 
     // Helper: Convert answer letter to index
