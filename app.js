@@ -4322,13 +4322,13 @@ D) 6</pre>
             return null;
         }
 
-        // Define ideal proportions for RRB test
+        // Define ideal proportions for RRB test (exact RRB CBT pattern)
         const idealProportions = {
-            'Mathematics': 0.20,
-            'General Intelligence & Reasoning': 0.15,
-            'Basic Science & Engineering': 0.35,
-            'General Awareness': 0.10,
-            'Computer Applications': 0.20
+            'Mathematics': 0.20,                                    // 20 questions (20%)
+            'General Intelligence & Reasoning': 0.15,              // 15 questions (15%)
+            'Basic Science & Engineering': 0.35,                   // 35 questions (35%)
+            'General Awareness': 0.10,                             // 10 questions (10%)
+            'Basics of Computers and Applications': 0.20           // 20 questions (20%)
         };
 
         // Calculate adaptive test size (aim for 25-100 questions based on availability)
@@ -4672,13 +4672,13 @@ D) 6</pre>
         
         const subjectMappings = {
             // Computer/Applications variations
-            'Computer Applications': 'Computer Applications',
-            'Basics of Computers and Applications': 'Computer Applications',
-            'Computer Science': 'Computer Applications',
-            'Computers': 'Computer Applications',
-            'Computer Fundamentals': 'Computer Applications',
-            'IT': 'Computer Applications',
-            'Information Technology': 'Computer Applications',
+            'Computer Applications': 'Basics of Computers and Applications',
+            'Basics of Computers and Applications': 'Basics of Computers and Applications',
+            'Computer Science': 'Basics of Computers and Applications',
+            'Computers': 'Basics of Computers and Applications',
+            'Computer Fundamentals': 'Basics of Computers and Applications',
+            'IT': 'Basics of Computers and Applications',
+            'Information Technology': 'Basics of Computers and Applications',
             
             // Science variations
             'Basic Science & Engineering': 'Basic Science & Engineering',
@@ -5952,7 +5952,7 @@ D) 6</pre>
             }
             
             const subjects = ['Mathematics', 'General Intelligence & Reasoning', 
-                            'Basic Science & Engineering', 'General Awareness', 'Computer Applications'];
+                            'Basic Science & Engineering', 'General Awareness', 'Basics of Computers and Applications'];
             const subjectScores = subjects.map(subject => {
                 const subjectResults = userResults.map(result => {
                     const subjectQuestions = result.questions.filter(q => q.subject === subject);
@@ -6015,7 +6015,7 @@ D) 6</pre>
             
             const subjects = ['Mathematics', 'Reasoning', 'Basic Science', 'General Awareness', 'Computer Apps'];
             const fullSubjects = ['Mathematics', 'General Intelligence & Reasoning', 
-                                'Basic Science & Engineering', 'General Awareness', 'Computer Applications'];
+                                'Basic Science & Engineering', 'General Awareness', 'Basics of Computers and Applications'];
             
             const subjectScores = fullSubjects.map(subject => {
                 const subjectResults = userResults.map(result => {
