@@ -294,10 +294,26 @@ class MockTestApp {
                 "electrical", "mechanical", "civil", "electronic", "computer", "railway recruitment board"
             ],
             
-            // Mathematical expressions and symbols
+            // Enhanced mathematical expressions and symbols including Unicode and LaTeX
             math_expressions: [
-                "=", "+", "-", "×", "÷", "√", "²", "³", "°", "%", "∞", "∠", "△", "□", "○",
-                "sin", "cos", "tan", "log", "ln", "∑", "∏", "∫", "∂", "≤", "≥", "≠", "≈", "∝"
+                // Basic operators
+                "=", "+", "-", "×", "÷", "*", "/", "√", "²", "³", "°", "%", "∞",
+                // Comparison operators
+                "≤", "≥", "≠", "≈", "∝", "<", ">", "≡", "≅", "≪", "≫",
+                // Geometry symbols
+                "∠", "△", "□", "○", "∆", "∇", "⊥", "∥", "∦", "∵", "∴",
+                // Functions
+                "sin", "cos", "tan", "cot", "sec", "cosec", "log", "ln", "exp",
+                // Advanced math
+                "∑", "∏", "∫", "∂", "∇", "∈", "∉", "⊂", "⊃", "∪", "∩",
+                // Fractions and powers
+                "½", "⅓", "¼", "¾", "⅛", "⅜", "⅝", "⅞", "ⁿ", "₁", "₂", "₃",
+                // Greek letters
+                "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "λ", "μ", "π", "ρ", "σ", "φ", "ψ", "ω",
+                "Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Λ", "Μ", "Π", "Ρ", "Σ", "Φ", "Ψ", "Ω",
+                // LaTeX patterns
+                "\\frac", "\\sqrt", "\\sum", "\\int", "\\lim", "\\sin", "\\cos", "\\tan",
+                "\\alpha", "\\beta", "\\gamma", "\\delta", "\\pi", "\\theta", "\\omega"
             ]
         };
     }
@@ -1403,6 +1419,216 @@ class MockTestApp {
         return solutionsPatterns.some(pattern => pattern.test(content));
     }
 
+    // Enhanced answer key auto-detection and parsing
+    autoDetectAndParseAnswerKeys(text, extractedQuestions) {
+        console.log('🔍 Auto-detecting answer keys from PDF content...');
+        
+        const answerKeyData = {
+            detected: false,
+            answers: {},
+            confidence: 0,
+            format: 'unknown',
+            startIndex: -1,
+            endIndex: -1
+        };
+
+        try {
+            // Multiple answer key detection strategies
+            const strategies = [
+                this.detectGridAnswerKey.bind(this),
+                this.detectListAnswerKey.bind(this),
+                this.detectTableAnswerKey.bind(this),
+                this.detectInlineAnswerKey.bind(this)
+            ];
+
+            for (const strategy of strategies) {
+                const result = strategy(text);
+                if (result.detected && result.confidence > answerKeyData.confidence) {
+                    Object.assign(answerKeyData, result);
+                }
+            }
+
+            // Apply detected answers to questions if confidence is high enough
+            if (answerKeyData.detected && answerKeyData.confidence > 60) {
+                console.log(`✅ Answer key detected with ${answerKeyData.confidence}% confidence (${answerKeyData.format} format)`);
+                this.applyAnswerKeyToQuestions(extractedQuestions, answerKeyData.answers);
+                return { success: true, appliedAnswers: Object.keys(answerKeyData.answers).length, ...answerKeyData };
+            } else {
+                console.log('❌ No reliable answer key detected');
+                return { success: false, reason: 'Low confidence or no answer key found' };
+            }
+
+        } catch (error) {
+            console.error('Error in answer key auto-detection:', error);
+            return { success: false, reason: 'Error during detection', error: error.message };
+        }
+    }
+
+    // Strategy 1: Grid format answer key (common in competitive exams)
+    detectGridAnswerKey(text) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'grid' };
+        
+        // Pattern: 1.A 2.B 3.C 4.D 5.A (in grid-like layout)
+        const gridPatterns = [
+            /(?:^|\n)\s*(\d+)\s*[.\-:]\s*([A-D])\s+(\d+)\s*[.\-:]\s*([A-D])\s+(\d+)\s*[.\-:]\s*([A-D])/gm,
+            /(?:^|\n)\s*(\d+)\s*[.\-:]\s*([A-D])\s*(?:\s+(\d+)\s*[.\-:]\s*([A-D]))?/gm
+        ];
+
+        let totalMatches = 0;
+        gridPatterns.forEach(pattern => {
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                // Parse grid format matches
+                for (let i = 1; i < match.length; i += 2) {
+                    if (match[i] && match[i + 1]) {
+                        const qNum = parseInt(match[i]);
+                        const answer = match[i + 1].toUpperCase();
+                        if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
+                            result.answers[qNum] = this.answerLetterToIndex(answer);
+                            totalMatches++;
+                        }
+                    }
+                }
+            }
+        });
+
+        if (totalMatches > 10) {
+            result.detected = true;
+            result.confidence = Math.min(90, 60 + (totalMatches * 2));
+        }
+
+        return result;
+    }
+
+    // Strategy 2: List format answer key
+    detectListAnswerKey(text) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'list' };
+        
+        // Pattern: 1. A, 2. B, 3. C (sequential list)
+        const listPatterns = [
+            /(\d+)\s*[.\-:]\s*([A-D])/g,
+            /(\d+)\s*[.\-:]\s*\(([A-D])\)/g,
+            /(\d+)\s*[.\-:]\s*([A-D])\s*(?:,|;|\n|$)/g
+        ];
+
+        let totalMatches = 0;
+        let consecutiveCount = 0;
+        let lastQuestionNum = 0;
+
+        listPatterns.forEach(pattern => {
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                const qNum = parseInt(match[1]);
+                const answer = match[2].toUpperCase();
+                
+                if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
+                    result.answers[qNum] = this.answerLetterToIndex(answer);
+                    totalMatches++;
+                    
+                    // Check for consecutive numbering (indicates proper answer key)
+                    if (qNum === lastQuestionNum + 1) {
+                        consecutiveCount++;
+                    }
+                    lastQuestionNum = qNum;
+                }
+            }
+        });
+
+        if (totalMatches > 15 && consecutiveCount > 10) {
+            result.detected = true;
+            result.confidence = Math.min(95, 70 + consecutiveCount);
+        }
+
+        return result;
+    }
+
+    // Strategy 3: Table format answer key
+    detectTableAnswerKey(text) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'table' };
+        
+        // Pattern: Table with Q.No | Answer columns
+        const tablePatterns = [
+            /Q\.?\s*No\.?\s*[|\t]\s*Answer[\s\S]*?(\d+)\s*[|\t]\s*([A-D])/gi,
+            /Question\s*[|\t]\s*Answer[\s\S]*?(\d+)\s*[|\t]\s*([A-D])/gi
+        ];
+
+        let totalMatches = 0;
+        tablePatterns.forEach(pattern => {
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                const qNum = parseInt(match[1]);
+                const answer = match[2].toUpperCase();
+                
+                if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
+                    result.answers[qNum] = this.answerLetterToIndex(answer);
+                    totalMatches++;
+                }
+            }
+        });
+
+        if (totalMatches > 8) {
+            result.detected = true;
+            result.confidence = Math.min(85, 50 + (totalMatches * 3));
+        }
+
+        return result;
+    }
+
+    // Strategy 4: Inline answer key (answers within question text)
+    detectInlineAnswerKey(text) {
+        const result = { detected: false, answers: {}, confidence: 0, format: 'inline' };
+        
+        // Pattern: Answer: A or Ans: B within text
+        const inlinePatterns = [
+            /(?:Answer|Ans|Correct)\s*[:\-]\s*([A-D])/gi,
+            /\(Correct\s*[:\-]\s*([A-D])\)/gi
+        ];
+
+        // This strategy has lower confidence as it might pick up explanations
+        let totalMatches = 0;
+        inlinePatterns.forEach(pattern => {
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                const answer = match[1].toUpperCase();
+                if (['A', 'B', 'C', 'D'].includes(answer)) {
+                    totalMatches++;
+                }
+            }
+        });
+
+        if (totalMatches > 20) {
+            result.detected = true;
+            result.confidence = Math.min(60, 30 + totalMatches); // Lower confidence for inline
+        }
+
+        return result;
+    }
+
+    // Apply detected answer key to questions
+    applyAnswerKeyToQuestions(questions, answerKey) {
+        let appliedCount = 0;
+        
+        questions.forEach(question => {
+            const qNum = question.questionNumber || question.number;
+            if (qNum && answerKey[qNum] !== undefined) {
+                question.correctAnswer = answerKey[qNum];
+                question.explanation = question.explanation || `Answer detected from PDF answer key: Option ${String.fromCharCode(65 + answerKey[qNum])}`;
+                question.answerSource = 'auto-detected';
+                question.needsReview = false; // Mark as reviewed since we have the answer
+                appliedCount++;
+            }
+        });
+
+        console.log(`✅ Applied answers to ${appliedCount} questions from answer key`);
+        return appliedCount;
+    }
+
+    // Helper: Convert answer letter to index
+    answerLetterToIndex(letter) {
+        const mapping = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+        return mapping[letter.toUpperCase()] || 0;
+    }
+
     // Validate RRB-specific question format
     isValidRRBQuestion(questionText, options, questionNumber) {
         // Basic validation
@@ -1945,6 +2171,42 @@ class MockTestApp {
                 }
             }
             
+            // Enhanced Answer Key Auto-Detection
+            if (validQuestions.length > 5) {
+                this.updateProcessingStep('🔍 Auto-detecting answer keys from PDF...');
+                
+                const answerKeyResult = this.autoDetectAndParseAnswerKeys(preprocessedText, validQuestions);
+                
+                if (answerKeyResult.success) {
+                    this.updateProcessingStep(`✅ Answer key detected! Applied answers to ${answerKeyResult.appliedAnswers} questions (${answerKeyResult.confidence}% confidence)`);
+                    
+                    // Update questions with mathematical rendering
+                    validQuestions = validQuestions.map(q => ({
+                        ...q,
+                        text: this.renderMathematicalExpressions(q.text),
+                        options: q.options.map(opt => this.renderMathematicalExpressions(opt)),
+                        hasAutoAnswer: q.answerSource === 'auto-detected',
+                        mathRendered: true
+                    }));
+                } else {
+                    this.updateProcessingStep('⚠️ No answer key detected - questions will need manual review');
+                    
+                    // Still apply mathematical rendering
+                    validQuestions = validQuestions.map(q => ({
+                        ...q,
+                        text: this.renderMathematicalExpressions(q.text),
+                        options: q.options.map(opt => this.renderMathematicalExpressions(opt)),
+                        mathRendered: true
+                    }));
+                }
+            }
+            
+            // Extract and associate images with questions
+            if (validQuestions.length > 0) {
+                this.updateProcessingStep('🖼️ Processing image references...');
+                validQuestions = this.associateImagesWithQuestions(validQuestions, []);
+            }
+            
             // Handle Mixed/Practice Books - detect individual question subjects/chapters
             if (this.currentPDFMetadata.subject === 'Mixed/Practice Books' && validQuestions.length > 0) {
                 this.updateProcessingStep('🔍 Analyzing mixed content for individual subjects...');
@@ -2106,37 +2368,175 @@ class MockTestApp {
     }
 
     preprocessPDFText(text) {
-        console.log('Preprocessing text of length:', text.length);
+        console.log('Enhanced preprocessing PDF text for mathematical expressions...');
+        console.log('Processing text of length:', text.length);
         
         if (!text || text.trim().length === 0) {
             console.warn('Empty text provided for preprocessing');
             return '';
         }
         
-        let cleanedText = text
-            // Remove page breaks
-            .replace(/--- PAGE_BREAK ---/g, '\n')
-            // Remove extra whitespace but preserve line structure
-            .replace(/[ \t]+/g, ' ')
-            .replace(/\n\s*\n/g, '\n')
-            // Remove common PDF artifacts
-            .replace(/\f/g, '')
-            .replace(/\r/g, '')
-            // Remove timestamps and percentages that don't belong to questions
-            .replace(/\d{1,2}\/\d{1,2}\/\d{4}\s*-->\s*\d{1,2}:\d{2}\s*(AM|PM)\s*-\s*\d{1,2}:\d{2}\s*(AM|PM)/g, ' ')
-            .replace(/\d+\.\d+%\s*(Attempted|Right|Wrong)/g, ' ')
-            // Clean up question numbering variations
-            .replace(/([Qq]uestion)\s*[:\-]?\s*(\d+)\s*[:\.\)]\s*/g, 'Q$2. ')
-            .replace(/^(\d+)\s*[\.\)]\s*/gm, 'Q$1. ')
-            // Normalize option formatting
-            .replace(/\b([A-D])\s*[\)\.\]]\s*/g, '$1) ')
-            .replace(/\(([a-d])\)\s*/g, (match, letter) => `${letter.toUpperCase()}) `)
-            // Clean up multiple spaces
-            .replace(/\s+/g, ' ')
-            .trim();
+        // Store original text length for optimization metrics
+        const originalLength = text.length;
+        
+        // Step 1: Normalize various encodings and Unicode characters
+        text = this.normalizeUnicodeText(text);
+        
+        // Step 2: Fix common PDF extraction issues
+        text = this.fixPDFExtractionIssues(text);
+        
+        // Step 3: Enhance mathematical expression handling
+        text = this.enhanceMathematicalExpressions(text);
+        
+        // Step 4: Handle multi-line questions
+        text = this.normalizeMultiLineQuestions(text);
+        
+        // Step 5: Clean up spacing and formatting
+        text = this.cleanupTextFormatting(text);
+        
+        // Step 6: Detect and mark image references
+        text = this.detectImageReferences(text);
+        
+        console.log(`Enhanced text preprocessing complete: ${originalLength} → ${text.length} characters`);
+        return text;
+    }
 
-        console.log('Cleaned text length:', cleanedText.length);
-        return cleanedText;
+    // Normalize Unicode characters and mathematical symbols
+    normalizeUnicodeText(text) {
+        // Common Unicode to ASCII mappings for better parsing
+        const unicodeReplacements = {
+            // Mathematical operators
+            '×': ' × ', '÷': ' ÷ ', '≠': ' ≠ ', '≤': ' ≤ ', '≥': ' ≥ ',
+            '≈': ' ≈ ', '∞': ' ∞ ', '±': ' ± ',
+            // Greek letters commonly used in math
+            'α': ' α ', 'β': ' β ', 'γ': ' γ ', 'δ': ' δ ',
+            'ε': ' ε ', 'θ': ' θ ', 'λ': ' λ ', 'μ': ' μ ',
+            'π': ' π ', 'ρ': ' ρ ', 'σ': ' σ ', 'φ': ' φ ', 'ω': ' ω ',
+            // Fractions
+            '½': ' ½ ', '⅓': ' ⅓ ', '¼': ' ¼ ', '¾': ' ¾ ',
+            '⅛': ' ⅛ ', '⅜': ' ⅜ ', '⅝': ' ⅝ ', '⅞': ' ⅞ ',
+            // Superscripts and subscripts
+            '²': '²', '³': '³', '⁴': '⁴', '⁵': '⁵',
+            '₁': '₁', '₂': '₂', '₃': '₃', '₄': '₄',
+            // Common symbols
+            '°': '°', '√': ' √ ', '∑': ' ∑ ', '∏': ' ∏ '
+        };
+        
+        Object.entries(unicodeReplacements).forEach(([unicode, replacement]) => {
+            text = text.replace(new RegExp(unicode, 'g'), replacement);
+        });
+        
+        return text;
+    }
+
+    // Fix common PDF extraction issues
+    fixPDFExtractionIssues(text) {
+        // Remove page breaks
+        text = text.replace(/--- PAGE_BREAK ---/g, '\n');
+        
+        // Fix broken words that span lines
+        text = text.replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2');
+        
+        // Fix scattered characters (common in PDFs with complex layouts)
+        text = text.replace(/([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])/g, (match, a, b, c) => {
+            // Only fix if it looks like a scattered word (short sequences)
+            if (match.length > 10) return match; 
+            return a + b + c;
+        });
+        
+        // Remove common PDF artifacts
+        text = text.replace(/\f/g, '').replace(/\r/g, '');
+        
+        // Remove timestamps and percentages that don't belong to questions
+        text = text.replace(/\d{1,2}\/\d{1,2}\/\d{4}\s*-->\s*\d{1,2}:\d{2}\s*(AM|PM)\s*-\s*\d{1,2}:\d{2}\s*(AM|PM)/g, ' ');
+        text = text.replace(/\d+\.\d+%\s*(Attempted|Right|Wrong)/g, ' ');
+        
+        return text;
+    }
+
+    // Enhanced mathematical expression handling
+    enhanceMathematicalExpressions(text) {
+        // Detect and preserve mathematical expressions
+        const mathPatterns = [
+            // Equations with equals
+            /([a-zA-Z0-9\+\-\*\/\(\)\^\√\°π\≤\≥\≠\×\÷]+\s*[=≈]\s*[a-zA-Z0-9\+\-\*\/\(\)\^\√\°π\≤\≥\≠\×\÷]+)/g,
+            // Functions
+            /(sin|cos|tan|cot|sec|cosec|log|ln|exp)\s*\([^)]+\)/g,
+            // Fractions in text form
+            /\b(\d+)\/(\d+)\b/g,
+            // Powers and roots
+            /\b\w+\^[0-9²³⁴⁵]+\b/g,
+            // Mathematical sequences
+            /\b\d+,\s*\d+,\s*\d+(?:,\s*\d+)*/g,
+            // LaTeX-like expressions
+            /\\[a-zA-Z]+\{[^}]*\}/g
+        ];
+        
+        // Mark mathematical expressions for special handling
+        mathPatterns.forEach((pattern, index) => {
+            text = text.replace(pattern, (match) => {
+                return `<MATH_${index}>${match}</MATH_${index}>`;
+            });
+        });
+        
+        return text;
+    }
+
+    // Normalize multi-line questions
+    normalizeMultiLineQuestions(text) {
+        // Clean up question numbering variations
+        text = text.replace(/([Qq]uestion)\s*[:\-]?\s*(\d+)\s*[:\.\)]\s*/g, 'Q$2. ');
+        text = text.replace(/^(\d+)\s*[\.\)]\s*/gm, 'Q$1. ');
+        
+        // Join question text that spans multiple lines
+        text = text.replace(/(Q?\d+\.\s+[^A-D\n]+)\n+([^A-D\nQ\d]+)(?=\s*[A-D]\))/g, '$1 $2');
+        
+        // Handle questions where options are on separate lines
+        text = text.replace(/([^.?!])\n+([A-D]\))/g, '$1 $2');
+        
+        return text;
+    }
+
+    // Clean up text formatting
+    cleanupTextFormatting(text) {
+        // Normalize option formatting
+        text = text.replace(/\b([A-D])\s*[\)\.\]]\s*/g, '$1) ');
+        text = text.replace(/\(([a-d])\)\s*/g, (match, letter) => `${letter.toUpperCase()}) `);
+        
+        // Fix option markers that got separated
+        text = text.replace(/(\n|^)\s*([A-D])\s*\)\s*/g, ' $2) ');
+        
+        // Fix question numbers that got separated
+        text = text.replace(/(\n|^)\s*([Qq]?\d+)\s*\.\s*/g, '\n$2. ');
+        
+        // Remove excessive whitespace but preserve structure
+        text = text.replace(/[ \t]+/g, ' ');
+        text = text.replace(/\n\s*\n\s*\n/g, '\n\n');
+        
+        return text.trim();
+    }
+
+    // Detect image references in the text
+    detectImageReferences(text) {
+        const imagePatterns = [
+            /figure\s*\d*/gi,
+            /diagram\s*\d*/gi,
+            /image\s*\d*/gi,
+            /graph\s*\d*/gi,
+            /chart\s*\d*/gi,
+            /circuit\s*(diagram)?/gi,
+            /refer\s+to\s+the\s+(figure|diagram|image|graph)/gi,
+            /see\s+(figure|diagram|image|graph)/gi,
+            /shown\s+in\s+(figure|diagram|image|graph)/gi
+        ];
+        
+        imagePatterns.forEach(pattern => {
+            text = text.replace(pattern, (match) => {
+                return `<IMAGE_REF>${match}</IMAGE_REF>`;
+            });
+        });
+        
+        return text;
     }
 
     extractQuestionsWithMultipleStrategies(text, pageTexts) {
@@ -5128,10 +5528,28 @@ D) 6</pre>
         const question = this.testSession.questions[this.testSession.currentQuestion];
         const questionNum = this.testSession.currentQuestion + 1;
         
+        // Enhanced rendering with mathematical expressions
+        const questionTextEl = document.getElementById('questionText');
+        if (questionTextEl) {
+            // Render mathematical expressions in question text
+            const mathRenderedText = question.mathRendered ? 
+                question.text : 
+                this.renderMathematicalExpressions(question.text);
+            questionTextEl.innerHTML = mathRenderedText;
+            
+            // Add image placeholders if present
+            if (question.hasImages) {
+                questionTextEl.innerHTML += this.renderImagePlaceholders(question.imageReferences);
+            }
+            
+            // Trigger MathJax rendering
+            this.renderMathJax(questionTextEl);
+        }
+        
+        // Update other elements
         const elements = {
             'currentQuestionNum': questionNum,
-            'testProgress': `Question ${questionNum} of ${this.testSession.questions.length}`,
-            'questionText': question.text
+            'testProgress': `Question ${questionNum} of ${this.testSession.questions.length}`
         };
         
         Object.keys(elements).forEach(id => {
@@ -5139,19 +5557,28 @@ D) 6</pre>
             if (el) el.textContent = elements[id];
         });
         
-        const optionsHtml = question.options.map((option, index) => `
-            <div class="option ${this.testSession.answers[this.testSession.currentQuestion] === index ? 'selected' : ''}" 
-                 onclick="app.selectOption(${index})">
-                <input type="radio" name="question_${this.testSession.currentQuestion}" 
-                       value="${index}" ${this.testSession.answers[this.testSession.currentQuestion] === index ? 'checked' : ''}>
-                <span class="option-label">${String.fromCharCode(65 + index)}.</span>
-                <span class="option-text">${option}</span>
-            </div>
-        `).join('');
+        // Enhanced options rendering with mathematical expressions
+        const optionsHtml = question.options.map((option, index) => {
+            const mathRenderedOption = question.mathRendered ? 
+                option : 
+                this.renderMathematicalExpressions(option);
+            
+            return `
+                <div class="option ${this.testSession.answers[this.testSession.currentQuestion] === index ? 'selected' : ''}" 
+                     onclick="app.selectOption(${index})">
+                    <input type="radio" name="question_${this.testSession.currentQuestion}" 
+                           value="${index}" ${this.testSession.answers[this.testSession.currentQuestion] === index ? 'checked' : ''}>
+                    <span class="option-label">${String.fromCharCode(65 + index)}.</span>
+                    <span class="option-text tex2jax_process">${mathRenderedOption}</span>
+                </div>
+            `;
+        }).join('');
         
         const questionOptionsEl = document.getElementById('questionOptions');
         if (questionOptionsEl) {
             questionOptionsEl.innerHTML = optionsHtml;
+            // Trigger MathJax rendering for options
+            this.renderMathJax(questionOptionsEl);
         }
         
         // Update navigation buttons
@@ -6296,6 +6723,131 @@ D) 6</pre>
         
         message += '\n\n✅ All content has been saved and is ready for use.';
         return message;
+    }
+
+    // Enhanced mathematical expression rendering using MathJax
+    renderMathematicalExpressions(text) {
+        if (!text) return text;
+        
+        // Convert common mathematical notations to MathJax format
+        let mathText = text;
+        
+        // Replace marked mathematical expressions
+        mathText = mathText.replace(/<MATH_(\d+)>(.*?)<\/MATH_\1>/g, (match, index, content) => {
+            return this.formatMathExpression(content);
+        });
+        
+        // Convert common math patterns to LaTeX
+        const mathPatterns = [
+            { pattern: /(\d+)\/(\d+)/g, replacement: '\\frac{$1}{$2}' },
+            { pattern: /(\w+)\^(\d+)/g, replacement: '$1^{$2}' },
+            { pattern: /sqrt\(([^)]+)\)/g, replacement: '\\sqrt{$1}' },
+            { pattern: /\b(sin|cos|tan|log|ln)\(([^)]+)\)/g, replacement: '\\$1($2)' }
+        ];
+        
+        mathPatterns.forEach(({ pattern, replacement }) => {
+            mathText = mathText.replace(pattern, replacement);
+        });
+        
+        return mathText;
+    }
+
+    // Format mathematical expressions for MathJax
+    formatMathExpression(expr) {
+        // Simple expressions can be inline
+        if (expr.length < 20 && !expr.includes('=')) {
+            return `$${expr}$`;
+        }
+        // Complex expressions should be displayed
+        return `$$${expr}$$`;
+    }
+
+    // Trigger MathJax rendering for dynamically added content
+    renderMathJax(element) {
+        if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+            MathJax.typesetPromise([element]).catch((err) => {
+                console.warn('MathJax rendering error:', err);
+            });
+        }
+    }
+
+    // Enhanced image extraction from PDF (placeholder for future implementation)
+    extractImagesFromPDF(pdf) {
+        console.log('🖼️ Extracting images from PDF...');
+        
+        const imageReferences = [];
+        
+        // This is a placeholder for actual image extraction
+        // In a full implementation, you would:
+        // 1. Extract image data from PDF pages
+        // 2. Convert to base64 or save as files
+        // 3. Associate with question numbers
+        // 4. Store references for display
+        
+        // For now, we'll detect image placeholders in text
+        return imageReferences;
+    }
+
+    // Associate images with questions based on proximity and references
+    associateImagesWithQuestions(questions, imageReferences) {
+        console.log('🔗 Associating images with questions...');
+        
+        questions.forEach(question => {
+            // Check if question text references an image
+            const imageRefs = question.text.match(/<IMAGE_REF>(.*?)<\/IMAGE_REF>/g);
+            if (imageRefs) {
+                question.hasImages = true;
+                question.imageReferences = imageRefs.map(ref => 
+                    ref.replace(/<\/?IMAGE_REF>/g, '')
+                );
+            }
+        });
+        
+        return questions;
+    }
+
+    // Enhanced question rendering with math and image support
+    renderQuestionWithEnhancements(question, container) {
+        // Render mathematical expressions
+        const mathRenderedText = this.renderMathematicalExpressions(question.text);
+        const mathRenderedOptions = question.options.map(opt => 
+            this.renderMathematicalExpressions(opt)
+        );
+        
+        // Create question HTML with enhanced support
+        container.innerHTML = `
+            <div class="question-content-enhanced">
+                <div class="question-text">${mathRenderedText}</div>
+                ${question.hasImages ? this.renderImagePlaceholders(question.imageReferences) : ''}
+                <div class="question-options">
+                    ${mathRenderedOptions.map((option, index) => `
+                        <div class="option" data-value="${index}">
+                            <span class="option-label">${String.fromCharCode(65 + index)})</span>
+                            <span class="option-text">${option}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        
+        // Trigger MathJax rendering
+        this.renderMathJax(container);
+    }
+
+    // Render image placeholders
+    renderImagePlaceholders(imageReferences) {
+        if (!imageReferences || imageReferences.length === 0) return '';
+        
+        return `
+            <div class="question-images">
+                ${imageReferences.map(ref => `
+                    <div class="image-placeholder">
+                        <span class="image-icon">🖼️</span>
+                        <span class="image-text">${ref}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 
     // Enhanced error message builder with actionable guidance
