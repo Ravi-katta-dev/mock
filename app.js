@@ -4276,7 +4276,7 @@ D) 6</pre>
 
         return {
             title: `Full Mock Test (${actualTotal} Questions)`,
-            duration: Math.max(30, Math.min(90, Math.ceil(actualTotal * 0.9))), // ~0.9 min per question
+            duration: 90, // Always 90 minutes as per RRB exam pattern
             subjects: subjects,
             totalQuestions: actualTotal,
             isAdaptive: true
@@ -4334,7 +4334,7 @@ D) 6</pre>
         
         return {
             title: `${subject} Test (${questionCount} Questions)`,
-            duration: Math.max(15, Math.min(30, Math.ceil(questionCount * 1.2))), // ~1.2 min per question
+            duration: 22.5, // Standard RRB subject-wise test duration (22.5 minutes for 25 questions)
             subjects: { [subject]: questionCount },
             totalQuestions: questionCount,
             isAdaptive: true
