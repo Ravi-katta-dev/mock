@@ -1554,43 +1554,89 @@ class MockTestApp {
         return result;
     }
 
-    // Strategy 2: List format answer key
+    // Strategy 2: Enhanced List format answer key detection with better patterns
     detectListAnswerKey(text) {
         const result = { detected: false, answers: {}, confidence: 0, format: 'list' };
         
-        // Pattern: 1. A, 2. B, 3. C (sequential list)
+        // Enhanced patterns for list format detection including more variations
         const listPatterns = [
+            // Standard patterns
             /(\d+)\s*[.\-:]\s*([A-D])/g,
             /(\d+)\s*[.\-:]\s*\(([A-D])\)/g,
-            /(\d+)\s*[.\-:]\s*([A-D])\s*(?:,|;|\n|$)/g
+            /(\d+)\s*[.\-:]\s*([A-D])\s*(?:,|;|\n|$)/g,
+            
+            // Additional patterns for better coverage
+            /^\s*(\d+)[\s\.]\s*([A-D])\s*$/gm,  // Simple number-answer format
+            /(\d+)\s*\)\s*([A-D])/g,  // Number with closing parenthesis
+            /(\d+)\s*\.?\s*([A-D])(?=\s|$)/g,  // Flexible dot pattern
+            
+            // Answer format variations
+            /Answer\s*(\d+)\s*[:\-]\s*([A-D])/gi,
+            /Q\.?\s*(\d+)\s*:\s*([A-D])/gi,
+            
+            // Spaced out lists
+            /(\d+)\s{2,}([A-D])/g
         ];
 
         let totalMatches = 0;
         let consecutiveCount = 0;
         let lastQuestionNum = 0;
+        let bestPatternResult = {};
 
-        listPatterns.forEach(pattern => {
+        listPatterns.forEach((pattern, patternIndex) => {
+            const tempAnswers = {};
+            let patternMatches = 0;
+            let patternConsecutive = 0;
+            let lastNum = 0;
+            
+            pattern.lastIndex = 0;
             let match;
+            
             while ((match = pattern.exec(text)) !== null) {
                 const qNum = parseInt(match[1]);
                 const answer = match[2].toUpperCase();
                 
                 if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
-                    result.answers[qNum] = this.answerLetterToIndex(answer);
-                    totalMatches++;
-                    
-                    // Check for consecutive numbering (indicates proper answer key)
-                    if (qNum === lastQuestionNum + 1) {
-                        consecutiveCount++;
+                    // Check context to avoid false positives
+                    const context = text.substring(Math.max(0, match.index - 30), match.index + 50);
+                    if (this.isLikelyAnswerKeyContext(context, match[0])) {
+                        tempAnswers[qNum] = this.answerLetterToIndex(answer);
+                        patternMatches++;
+                        
+                        if (qNum === lastNum + 1) {
+                            patternConsecutive++;
+                        }
+                        lastNum = qNum;
                     }
-                    lastQuestionNum = qNum;
                 }
+            }
+            
+            // Use this pattern if it's better than previous ones
+            if (patternMatches > totalMatches || 
+                (patternMatches === totalMatches && patternConsecutive > consecutiveCount)) {
+                result.answers = { ...tempAnswers };
+                totalMatches = patternMatches;
+                consecutiveCount = patternConsecutive;
+                lastQuestionNum = lastNum;
             }
         });
 
-        if (totalMatches > 15 && consecutiveCount > 10) {
+        // Lower threshold for detection with enhanced scoring
+        if (totalMatches >= 3) {  // Reduced from 15 to 3
             result.detected = true;
-            result.confidence = Math.min(95, 70 + consecutiveCount);
+            let baseConfidence = 45 + (totalMatches * 5);
+            
+            // Bonus for consecutive questions (indicates proper answer key)
+            if (consecutiveCount >= 3) {
+                baseConfidence += 25;
+            }
+            
+            // Bonus for many matches
+            if (totalMatches >= 10) {
+                baseConfidence += 15;
+            }
+            
+            result.confidence = Math.min(95, baseConfidence);
         }
 
         return result;
@@ -1841,17 +1887,17 @@ class MockTestApp {
         return result;
     }
 
-    // Strategy 5: Pattern-based answer detection (circles, checkmarks, bold text)
+    // Strategy 5: Enhanced Pattern-based answer detection (circles, checkmarks, bold text)
     detectPatternBasedAnswers(text) {
         const result = { detected: false, answers: {}, confidence: 0, format: 'pattern' };
         
-        // Detect various answer marking patterns
+        // Detect various answer marking patterns with enhanced recognition
         const patternTypes = [
             // Filled circles or bullets
-            { pattern: /(\d+)\.?\s*[●○▪▫•]?\s*([A-D])/g, name: 'bullet', weight: 1.2 },
+            { pattern: /(\d+)\.?\s*[●○▪▫•]\s*([A-D])/g, name: 'bullet', weight: 1.2 },
             
             // Checkmarks or X marks
-            { pattern: /(\d+)\.?\s*[✓✗×]?\s*([A-D])/g, name: 'checkmark', weight: 1.3 },
+            { pattern: /(\d+)\.?\s*[✓✗×]\s*([A-D])/g, name: 'checkmark', weight: 1.3 },
             
             // Bold or emphasized text (common patterns)
             { pattern: /(\d+)\.?\s*\*([A-D])\*/g, name: 'bold', weight: 1.1 },
@@ -1859,19 +1905,23 @@ class MockTestApp {
             // Underlined answers
             { pattern: /(\d+)\.?\s*_([A-D])_/g, name: 'underline', weight: 1.1 },
             
-            // Bracketed answers
-            { pattern: /(\d+)\.?\s*\[([A-D])\]/g, name: 'bracket', weight: 1.0 },
+            // Bracketed answers (enhanced pattern)
+            { pattern: /(\d+)\.?\s*\[([A-D])\]/g, name: 'bracket', weight: 1.2 },
             
             // Highlighted patterns (common text representations)
             { pattern: /(\d+)\.?\s*>([A-D])</g, name: 'highlight', weight: 1.2 },
             
-            // Answer with special markers
-            { pattern: /(\d+)\.?\s*(?:ANS|ANSWER):\s*([A-D])/gi, name: 'answer_marker', weight: 1.4 }
+            // Answer with special markers (enhanced)
+            { pattern: /(\d+)\.?\s*(?:ANS|ANSWER):\s*([A-D])/gi, name: 'answer_marker', weight: 1.5 },
+            
+            // Enhanced bullet patterns
+            { pattern: /(\d+)\.\s*●([A-D])/g, name: 'dot_bullet', weight: 1.3 }
         ];
 
         let totalMatches = 0;
         let weightedScore = 0;
         let bestPatternName = '';
+        const detectedPatterns = {};
 
         patternTypes.forEach(patternType => {
             let patternMatches = 0;
@@ -1884,13 +1934,21 @@ class MockTestApp {
                 const answer = match[2].toUpperCase();
                 
                 if (qNum >= 1 && qNum <= 200 && ['A', 'B', 'C', 'D'].includes(answer)) {
-                    // Check context to avoid false positives
-                    const context = text.substring(Math.max(0, match.index - 30), match.index + 30);
+                    // Enhanced context checking for pattern-based answers
+                    const context = text.substring(Math.max(0, match.index - 40), match.index + 40);
                     if (this.isLikelyAnswerPattern(context, match[0])) {
-                        result.answers[qNum] = this.answerLetterToIndex(answer);
+                        // Avoid duplicates by checking if we already have this question
+                        if (!result.answers[qNum] || weightedScore < patternType.weight) {
+                            result.answers[qNum] = this.answerLetterToIndex(answer);
+                        }
                         patternMatches++;
                         totalMatches++;
                         weightedScore += patternType.weight;
+                        
+                        if (!detectedPatterns[patternType.name]) {
+                            detectedPatterns[patternType.name] = 0;
+                        }
+                        detectedPatterns[patternType.name]++;
                         
                         if (patternMatches > 0) {
                             bestPatternName = patternType.name;
@@ -1900,11 +1958,28 @@ class MockTestApp {
             }
         });
 
-        if (totalMatches >= 5) {
+        // Enhanced detection logic with pattern diversity bonus
+        if (totalMatches >= 3) {  // Reduced threshold
             result.detected = true;
-            result.confidence = Math.min(90, 50 + (weightedScore * 8));
+            
+            // Base confidence from matches and weighted score
+            let confidence = Math.min(90, 45 + (weightedScore * 6));
+            
+            // Bonus for pattern diversity (multiple pattern types found)
+            const patternTypes = Object.keys(detectedPatterns).length;
+            if (patternTypes > 1) {
+                confidence += (patternTypes - 1) * 5;
+            }
+            
+            // Bonus for high-value patterns (answer_marker, bracket)
+            if (detectedPatterns['answer_marker'] || detectedPatterns['bracket']) {
+                confidence += 10;
+            }
+            
+            result.confidence = Math.min(95, confidence);
             result.patternType = bestPatternName;
             result.totalMatches = totalMatches;
+            result.patternDiversity = patternTypes;
         }
 
         return result;
@@ -2164,21 +2239,28 @@ class MockTestApp {
         
         const allResults = [];
         
-        // Run all detection strategies
+        // Run all detection strategies with enhanced error handling
         const strategies = [
-            { name: 'grid', method: this.detectGridAnswerKey.bind(this) },
-            { name: 'list', method: this.detectListAnswerKey.bind(this) },
-            { name: 'table', method: this.detectTableAnswerKey.bind(this) },
-            { name: 'inline', method: this.detectInlineAnswerKey.bind(this) },
-            { name: 'pattern', method: this.detectPatternBasedAnswers.bind(this) },
-            { name: 'contextual', method: this.detectContextualAnswers.bind(this) }
+            { name: 'grid', method: this.detectGridAnswerKey.bind(this), priority: 3 },
+            { name: 'list', method: this.detectListAnswerKey.bind(this), priority: 4 },
+            { name: 'table', method: this.detectTableAnswerKey.bind(this), priority: 2 },
+            { name: 'inline', method: this.detectInlineAnswerKey.bind(this), priority: 5 },
+            { name: 'pattern', method: this.detectPatternBasedAnswers.bind(this), priority: 1 },
+            { name: 'contextual', method: this.detectContextualAnswers.bind(this), priority: 1, needsQuestions: true }
         ];
 
         strategies.forEach(strategy => {
             try {
-                const result = strategy.method(text);
-                if (result.detected) {
+                let result;
+                if (strategy.needsQuestions) {
+                    result = strategy.method(text, extractedQuestions);
+                } else {
+                    result = strategy.method(text);
+                }
+                
+                if (result.detected && Object.keys(result.answers).length > 0) {
                     result.strategyName = strategy.name;
+                    result.priority = strategy.priority;
                     allResults.push(result);
                     console.log(`✅ ${strategy.name} strategy: ${Object.keys(result.answers).length} answers, ${result.confidence}% confidence`);
                 }
@@ -2187,8 +2269,8 @@ class MockTestApp {
             }
         });
 
-        // Combine results using intelligent merging
-        const combinedResult = this.combineDetectionResults(allResults);
+        // Enhanced result combination with priority weighting
+        const combinedResult = this.enhancedCombineDetectionResults(allResults);
         
         if (combinedResult.detected) {
             console.log(`🎯 Combined result: ${Object.keys(combinedResult.answers).length} answers, ${combinedResult.confidence}% confidence`);
@@ -2200,8 +2282,8 @@ class MockTestApp {
         }
     }
 
-    // Intelligent result combination algorithm
-    combineDetectionResults(results) {
+    // Enhanced intelligent result combination algorithm with priority weighting
+    enhancedCombineDetectionResults(results) {
         if (results.length === 0) {
             return { detected: false, answers: {}, confidence: 0 };
         }
@@ -2210,13 +2292,13 @@ class MockTestApp {
             return results[0];
         }
 
-        console.log('🔀 Combining results from multiple detection strategies...');
+        console.log('🔀 Combining results from multiple detection strategies with enhanced logic...');
         
         const combinedAnswers = {};
         const answerSources = {};
         const confidenceScores = {};
 
-        // Collect all answers with their sources and confidence
+        // Collect all answers with their sources, confidence, and priority
         results.forEach(result => {
             Object.keys(result.answers).forEach(qNum => {
                 const answer = result.answers[qNum];
@@ -2230,24 +2312,29 @@ class MockTestApp {
                     combinedAnswers[qNum][answer] = 0;
                 }
                 
-                // Weight by confidence
-                const weight = result.confidence / 100;
-                combinedAnswers[qNum][answer] += weight;
+                // Enhanced weighting: confidence * priority * consistency bonus
+                const baseWeight = result.confidence / 100;
+                const priorityMultiplier = result.priority || 1;
+                const finalWeight = baseWeight * priorityMultiplier;
+                
+                combinedAnswers[qNum][answer] += finalWeight;
                 
                 answerSources[qNum].push({
                     strategy: result.strategyName,
                     answer: answer,
                     confidence: result.confidence,
-                    weight: weight
+                    priority: result.priority,
+                    weight: finalWeight
                 });
             });
         });
 
-        // Resolve conflicts and select best answers
+        // Enhanced conflict resolution
         const finalAnswers = {};
         let totalConfidence = 0;
         let answersWithConflicts = 0;
         let answersResolved = 0;
+        let highConfidenceCount = 0;
 
         Object.keys(combinedAnswers).forEach(qNum => {
             const answerOptions = combinedAnswers[qNum];
@@ -2258,38 +2345,57 @@ class MockTestApp {
             const secondBestScore = answerOptions[sortedAnswers[1]] || 0;
             
             // Check for conflicts
-            if (secondBestScore > 0 && (bestScore - secondBestScore) < 0.3) {
+            if (secondBestScore > 0 && (bestScore - secondBestScore) < 0.5) {
                 answersWithConflicts++;
                 console.log(`⚠️ Conflict for Q${qNum}: ${sortedAnswers.map(a => `${String.fromCharCode(65 + parseInt(a))}(${answerOptions[a].toFixed(2)})`).join(' vs ')}`);
             }
             
-            // Use best answer if confidence is reasonable
-            if (bestScore >= 0.4) {  // Minimum threshold
+            // Enhanced threshold: lower minimum but require higher confidence for auto-acceptance
+            if (bestScore >= 0.3) {  // Lower minimum threshold
                 finalAnswers[qNum] = bestAnswer;
                 answersResolved++;
                 
-                // Calculate confidence for this answer
-                const questionConfidence = Math.min(95, (bestScore * 100) + (bestScore - secondBestScore) * 20);
+                // Calculate confidence for this answer with enhanced scoring
+                let questionConfidence = Math.min(95, (bestScore * 80) + (bestScore - secondBestScore) * 30);
+                
+                // Bonus for high-priority strategies
+                const highPrioritySource = answerSources[qNum].find(source => source.priority >= 4 && source.answer == bestAnswer);
+                if (highPrioritySource) {
+                    questionConfidence += 10;
+                }
+                
+                // Bonus for multiple strategy agreement
+                const agreementCount = answerSources[qNum].filter(source => source.answer == bestAnswer).length;
+                if (agreementCount > 1) {
+                    questionConfidence += (agreementCount - 1) * 5;
+                }
+                
                 confidenceScores[qNum] = questionConfidence;
                 totalConfidence += questionConfidence;
+                
+                if (questionConfidence >= 80) {
+                    highConfidenceCount++;
+                }
             }
         });
 
         const avgConfidence = answersResolved > 0 ? totalConfidence / answersResolved : 0;
         
-        console.log(`📊 Resolution summary:`);
+        console.log(`📊 Enhanced resolution summary:`);
         console.log(`   • Total questions processed: ${Object.keys(combinedAnswers).length}`);
         console.log(`   • Answers resolved: ${answersResolved}`);
+        console.log(`   • High confidence answers: ${highConfidenceCount}`);
         console.log(`   • Conflicts detected: ${answersWithConflicts}`);
         console.log(`   • Average confidence: ${avgConfidence.toFixed(1)}%`);
 
         return {
-            detected: answersResolved >= 3,
+            detected: answersResolved >= 2,  // Reduced threshold
             answers: finalAnswers,
             confidence: avgConfidence,
             format: 'combined',
             conflicts: answersWithConflicts,
             totalResolved: answersResolved,
+            highConfidenceCount: highConfidenceCount,
             strategies: results.map(r => r.strategyName)
         };
     }
