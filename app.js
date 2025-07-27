@@ -2394,7 +2394,7 @@ class MockTestApp {
             /(\d+)\.([A-D])\s+(\d+)\.([A-D])/gi,  // "16.A 17.B"
             
             // Compact answer sequences
-            /(\d+)\s*[:\-\.]\s*([A-D])(?:\s*,\s*(\d+)\s*[:\-\.]\s*([A-D]))*+/gi,
+            /(\d+)\s*[:\-\.]\s*([A-D])(?:\s*,\s*(\d+)\s*[:\-\.]\s*([A-D]))*/gi,
             
             // Answer lines with ranges
             /(\d+)\s*-\s*(\d+)\s*:\s*([A-D\s]+)/gi,  // "1-10: A B C D A B C D A B"
