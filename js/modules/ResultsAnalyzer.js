@@ -1075,6 +1075,134 @@ ${results.performanceMetrics.recommendations.join('\n')}
     }
 
     /**
+     * Generate time-based recommendations
+     * @param {number} averageTime - Average time per question
+     * @param {Object} timingDistribution - Distribution of timing categories
+     * @returns {Array} Array of time-related recommendations
+     */
+    generateTimeRecommendations(averageTime, timingDistribution) {
+        const recommendations = [];
+        
+        if (averageTime > this.config.timeAnalysis.slow) {
+            recommendations.push('Focus on improving speed - practice time-bound questions');
+        }
+        
+        if (timingDistribution.tooSlow > timingDistribution.optimal) {
+            recommendations.push('Avoid spending too much time on difficult questions');
+        }
+        
+        if (timingDistribution.fast > timingDistribution.optimal) {
+            recommendations.push('Take more time to carefully read questions');
+        }
+        
+        if (recommendations.length === 0) {
+            recommendations.push('Good time management - maintain this pace');
+        }
+        
+        return recommendations;
+    }
+
+    /**
+     * Generate difficulty-based insights
+     * @param {Object} difficultyStats - Difficulty statistics
+     * @returns {Array} Array of insights
+     */
+    generateDifficultyInsights(difficultyStats) {
+        const insights = [];
+        
+        Object.entries(difficultyStats).forEach(([difficulty, stats]) => {
+            if (stats.accuracyRate < 50 && stats.total > 0) {
+                insights.push(`Struggling with ${difficulty.toLowerCase()} questions`);
+            } else if (stats.accuracyRate > 80 && stats.total > 0) {
+                insights.push(`Strong performance in ${difficulty.toLowerCase()} questions`);
+            }
+        });
+        
+        return insights;
+    }
+
+    /**
+     * Analyze difficulty pattern
+     * @param {Object} difficultyStats - Difficulty statistics
+     * @returns {Object} Pattern analysis
+     */
+    analyzeDifficultyPattern(difficultyStats) {
+        const patterns = {
+            strengths: [],
+            weaknesses: [],
+            recommendations: []
+        };
+        
+        Object.entries(difficultyStats).forEach(([difficulty, stats]) => {
+            if (stats.accuracyRate > 70) {
+                patterns.strengths.push(difficulty);
+            } else if (stats.accuracyRate < 50) {
+                patterns.weaknesses.push(difficulty);
+            }
+        });
+        
+        if (patterns.weaknesses.length > 0) {
+            patterns.recommendations.push(`Focus on ${patterns.weaknesses.join(' and ').toLowerCase()} questions`);
+        }
+        
+        return patterns;
+    }
+
+    /**
+     * Calculate speed index based on average time
+     * @param {number} averageTime - Average time per question
+     * @returns {number} Speed index (0-100)
+     */
+    calculateSpeedIndex(averageTime) {
+        const optimalTime = this.config.timeAnalysis.optimal * 1000; // Convert to milliseconds
+        const ratio = averageTime / optimalTime;
+        
+        if (ratio <= 1) {
+            return 100; // Perfect or better than optimal
+        } else {
+            return Math.max(0, 100 - (ratio - 1) * 50);
+        }
+    }
+
+    /**
+     * Calculate efficiency index
+     * @param {Object} basicResults - Basic results
+     * @param {Object} timeAnalysis - Time analysis
+     * @returns {number} Efficiency index
+     */
+    calculateEfficiencyIndex(basicResults, timeAnalysis) {
+        const accuracyWeight = 0.7;
+        const speedWeight = 0.3;
+        
+        const accuracyScore = basicResults.accuracyRate;
+        const speedScore = this.calculateSpeedIndex(timeAnalysis.averageTimePerQuestion);
+        
+        return (accuracyScore * accuracyWeight) + (speedScore * speedWeight);
+    }
+
+    /**
+     * Calculate confidence calibration
+     * @param {number} highCorrect - High confidence correct answers
+     * @param {number} highIncorrect - High confidence incorrect answers
+     * @param {number} lowCorrect - Low confidence correct answers
+     * @param {number} lowIncorrect - Low confidence incorrect answers
+     * @returns {number} Calibration score (0-1)
+     */
+    calculateConfidenceCalibration(highCorrect, highIncorrect, lowCorrect, lowIncorrect) {
+        const highTotal = highCorrect + highIncorrect;
+        const lowTotal = lowCorrect + lowIncorrect;
+        
+        if (highTotal === 0 && lowTotal === 0) return 0.5;
+        
+        const highAccuracy = highTotal > 0 ? highCorrect / highTotal : 0;
+        const lowAccuracy = lowTotal > 0 ? lowCorrect / lowTotal : 0;
+        
+        // Good calibration means high confidence should have higher accuracy
+        const calibration = highAccuracy - lowAccuracy;
+        return Math.max(0, Math.min(1, (calibration + 1) / 2));
+    }
+
+    /**
      * Download file to user's device
      * @param {Blob} blob - File blob
      * @param {string} filename - Filename
