@@ -7069,6 +7069,12 @@ D) 6</pre>
     // =============== END INTELLIGENT TEST GENERATION ===============
 
     initializeTestInterface() {
+        // Use TestEngine if available
+        if (this.testEngine && this.testEngine.currentSession) {
+            return this.initializeTestInterfaceWithEngine();
+        }
+        
+        // Legacy initialization
         const testTitleEl = document.getElementById('testTitle');
         if (testTitleEl && this.testSession?.config) {
             let title = this.testSession.config.title;
@@ -7098,6 +7104,27 @@ D) 6</pre>
         this.startTimer();
         this.renderQuestion();
         this.renderQuestionPalette();
+    }
+
+    /**
+     * Initialize test interface using TestEngine
+     */
+    initializeTestInterfaceWithEngine() {
+        const sessionStatus = this.testEngine.getSessionStatus();
+        
+        const testTitleEl = document.getElementById('testTitle');
+        if (testTitleEl && this.testEngine.testConfig) {
+            let title = this.testEngine.testConfig.title || 'Test';
+            testTitleEl.textContent = title;
+            console.log('Test interface initialized with TestEngine, title:', title);
+        }
+        
+        // Initialize UI components
+        this.renderQuestion();
+        this.updateQuestionPalette();
+        this.updateProgressIndicators();
+        
+        console.log('TestEngine interface initialized:', sessionStatus);
     }
 
     startTimer() {
@@ -7501,6 +7528,47 @@ D) 6</pre>
             // Legacy submit
             return this.submitTestLegacy();
         }
+    }
+
+    /**
+     * Legacy test submission method
+     */
+    submitTestLegacy() {
+        if (!this.testSession) return;
+        
+        // Calculate results using legacy method
+        const result = {
+            userId: this.currentUser?.id || 'anonymous',
+            testType: this.testSession.config.title || 'Test',
+            questions: this.testSession.questions,
+            answers: this.testSession.answers,
+            startTime: this.testSession.startTime,
+            completedAt: Date.now(),
+            timeSpent: Date.now() - this.testSession.startTime,
+            totalQuestions: this.testSession.questions.length,
+            correctAnswers: 0,
+            incorrectAnswers: 0,
+            unattempted: 0,
+            marked: Array.from(this.testSession.markedQuestions || [])
+        };
+        
+        // Calculate scores
+        this.testSession.questions.forEach((question, index) => {
+            const userAnswer = this.testSession.answers[index];
+            if (userAnswer === -1 || userAnswer === undefined) {
+                result.unattempted++;
+            } else if (userAnswer === question.correctAnswer) {
+                result.correctAnswers++;
+            } else {
+                result.incorrectAnswers++;
+            }
+        });
+        
+        result.rawScore = result.correctAnswers - (result.incorrectAnswers * 0.33);
+        result.percentage = Math.max(0, (result.rawScore / result.totalQuestions) * 100);
+        
+        this.currentTest = result;
+        return result;
     }
 
     /**
