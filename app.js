@@ -118,12 +118,12 @@ class MockTestApp {
      */
     async initializeModule(moduleName) {
         const moduleMap = {
-            dataManager: window.dataManager,
+            dataManager: window.DataManager,
             userManager: window.userManager,
-            uiManager: window.uiManager,
-            questionManager: window.questionManager,
-            testEngine: window.testEngine,
-            resultsAnalyzer: window.resultsAnalyzer,
+            uiManager: window.UIManager,
+            questionManager: window.QuestionManager,
+            testEngine: window.TestEngine,
+            resultsAnalyzer: window.ResultsAnalyzer,
             pdfProcessor: window.pdfProcessor,
             answerKeyDetector: window.answerKeyDetector
         };
