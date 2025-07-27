@@ -1984,6 +1984,9 @@ class MockTestApp {
             return;
         }
 
+        // Initialize cancellation flag
+        this.pdfProcessingCancelled = false;
+
         // CRITICAL FIX: Capture form values IMMEDIATELY at the start
         const subjectElement = document.getElementById('pdfSubject');
         const chapterElement = document.getElementById('pdfChapter');
@@ -2048,55 +2051,126 @@ class MockTestApp {
                     ${isVisualDetectionEnabled ? '<p>🎨 Visual Highlight Detection: <strong>Enabled</strong></p>' : ''}
                     <div class="progress-details">
                         <p id="processingStep">Initializing PDF processing...</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                        <p id="progressText">0% complete</p>
+                    </div>
+                    <div class="processing-controls">
+                        <button id="cancelPDFProcessing" class="btn btn--secondary">🛑 Cancel Processing</button>
                     </div>
                 </div>
             `;
             processingDiv.style.display = 'block';
+
+            // Add cancel button functionality
+            const cancelBtn = document.getElementById('cancelPDFProcessing');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => {
+                    this.cancelPDFProcessing();
+                });
+            }
         }
 
         try {
             this.updateProcessingStep('Loading PDF document...');
+            this.updateProgress(5, 'PDF document loaded');
             
             const fileArrayBuffer = await this.currentPDFFile.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(fileArrayBuffer).promise;
             
             this.updateProcessingStep('Extracting text from pages...');
+            this.updateProgress(10, 'Starting page extraction');
             
             let fullText = '';
             let pageTexts = [];
-            
-            // Extract text and visual information page by page for better processing
             let pageVisualData = [];
             
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
+            // Chunked processing implementation: Process pages in chunks of 5
+            const CHUNK_SIZE = 5;
+            const totalPages = pdf.numPages;
+            let processedPages = 0;
+
+            for (let chunkStart = 1; chunkStart <= totalPages; chunkStart += CHUNK_SIZE) {
+                // Check for cancellation
+                if (this.pdfProcessingCancelled) {
+                    this.updateProcessingStep('Processing cancelled by user');
+                    return;
+                }
+
+                const chunkEnd = Math.min(chunkStart + CHUNK_SIZE - 1, totalPages);
+                const chunkNumber = Math.floor((chunkStart - 1) / CHUNK_SIZE) + 1;
+                const totalChunks = Math.ceil(totalPages / CHUNK_SIZE);
                 
-                // Get text with position information for better parsing
-                const pageItems = textContent.items.map(item => ({
-                    text: item.str,
-                    x: item.transform[4],
-                    y: item.transform[5],
-                    width: item.width,
-                    height: item.height
-                }));
+                this.updateProcessingStep(`Processing chunk ${chunkNumber}/${totalChunks} (pages ${chunkStart}-${chunkEnd})...`);
                 
-                const pageText = this.reconstructPageText(pageItems);
-                pageTexts.push(pageText);
-                fullText += pageText + '\n\n--- PAGE_BREAK ---\n\n';
+                // Process pages in current chunk
+                let chunkPages = [];
+                for (let i = chunkStart; i <= chunkEnd; i++) {
+                    if (this.pdfProcessingCancelled) {
+                        this.updateProcessingStep('Processing cancelled by user');
+                        return;
+                    }
+
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    
+                    // Get text with position information for better parsing
+                    const pageItems = textContent.items.map(item => ({
+                        text: item.str,
+                        x: item.transform[4],
+                        y: item.transform[5],
+                        width: item.width,
+                        height: item.height
+                    }));
+                    
+                    const pageText = this.reconstructPageText(pageItems);
+                    pageTexts.push(pageText);
+                    fullText += pageText + '\n\n--- PAGE_BREAK ---\n\n';
+                    
+                    // Extract visual highlight data for each page
+                    this.updateProcessingStep(`Processing page ${i} of ${totalPages} (chunk ${chunkNumber}/${totalChunks})...`);
+                    const visualData = await this.extractPageVisualData(page, pageItems);
+                    pageVisualData.push(visualData);
+                    
+                    // Explicitly cleanup page object after use
+                    if (page.cleanup && typeof page.cleanup === 'function') {
+                        page.cleanup();
+                    }
+                    
+                    processedPages++;
+                    const progress = Math.round((processedPages / totalPages) * 60) + 10; // 10-70% for page processing
+                    this.updateProgress(progress, `Processed ${processedPages}/${totalPages} pages`);
+                }
                 
-                // Extract visual highlight data for each page
-                this.updateProcessingStep(`Processing page ${i} of ${pdf.numPages} (including visual analysis)...`);
-                const visualData = await this.extractPageVisualData(page, pageItems);
-                pageVisualData.push(visualData);
+                // Memory management: Add delay between chunks and trigger garbage collection
+                if (chunkEnd < totalPages) {
+                    this.updateProcessingStep(`Chunk ${chunkNumber} complete. Optimizing memory...`);
+                    
+                    // Trigger garbage collection hint if available
+                    if (window.gc) {
+                        window.gc();
+                    }
+                    
+                    // Add delay to allow UI updates and memory cleanup
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+
+            // Check for cancellation before continuing
+            if (this.pdfProcessingCancelled) {
+                this.updateProcessingStep('Processing cancelled by user');
+                return;
             }
 
             this.updateProcessingStep('Analyzing question structure...');
+            this.updateProgress(70, 'Text extraction complete, analyzing structure');
             
             // Enhanced text preprocessing
             const preprocessedText = this.preprocessPDFText(fullText);
             
             this.updateProcessingStep('Extracting questions using multiple strategies...');
+            this.updateProgress(75, 'Question extraction in progress');
             
             // Multiple extraction strategies
             const extractedQuestions = this.extractQuestionsWithMultipleStrategies(preprocessedText, pageTexts);
@@ -2105,13 +2179,24 @@ class MockTestApp {
             
             // Apply visual highlight detection if enabled
             if (isVisualDetectionEnabled) {
+                if (this.pdfProcessingCancelled) {
+                    this.updateProcessingStep('Processing cancelled by user');
+                    return;
+                }
                 this.updateProcessingStep('Applying visual highlight detection...');
+                this.updateProgress(80, 'Applying visual detection');
                 questionsWithVisualData = this.applyVisualHighlightDetection(extractedQuestions, pageVisualData);
             } else {
                 console.log('📊 Visual highlight detection disabled by user');
             }
             
+            if (this.pdfProcessingCancelled) {
+                this.updateProcessingStep('Processing cancelled by user');
+                return;
+            }
+
             this.updateProcessingStep('Validating extracted questions...');
+            this.updateProgress(85, 'Validating questions');
             console.log('PDF metadata before validation:', this.currentPDFMetadata);
             
             // CRITICAL FIX: Declare validQuestions variable
@@ -2120,12 +2205,19 @@ class MockTestApp {
             // Enhanced processing with optimized chunking for very large datasets (1500+ questions)
             if (questionsWithVisualData.length > 1000) {
                 this.updateProcessingStep(`🚀 Large dataset detected: ${questionsWithVisualData.length} questions. Applying advanced optimizations...`);
+                this.updateProgress(87, 'Processing large dataset');
                 
                 // Smaller batch size for very large datasets to prevent memory issues
                 const batchSize = 50;
                 let processedQuestions = [];
                 
                 for (let i = 0; i < questionsWithVisualData.length; i += batchSize) {
+                    // Check for cancellation
+                    if (this.pdfProcessingCancelled) {
+                        this.updateProcessingStep('Processing cancelled by user');
+                        return;
+                    }
+
                     const batch = questionsWithVisualData.slice(i, i + batchSize);
                     const batchNumber = Math.floor(i / batchSize) + 1;
                     const totalBatches = Math.ceil(questionsWithVisualData.length / batchSize);
@@ -2155,12 +2247,19 @@ class MockTestApp {
                 
             } else if (questionsWithVisualData.length > 500) {
                 this.updateProcessingStep(`🔄 Processing medium dataset: ${questionsWithVisualData.length} questions found. Implementing optimizations...`);
+                this.updateProgress(87, 'Processing medium dataset');
                 
                 // Process in batches for better performance
                 const batchSize = 100;
                 let processedQuestions = [];
                 
                 for (let i = 0; i < questionsWithVisualData.length; i += batchSize) {
+                    // Check for cancellation
+                    if (this.pdfProcessingCancelled) {
+                        this.updateProcessingStep('Processing cancelled by user');
+                        return;
+                    }
+
                     const batch = questionsWithVisualData.slice(i, i + batchSize);
                     const batchNumber = Math.floor(i / batchSize) + 1;
                     const totalBatches = Math.ceil(questionsWithVisualData.length / batchSize);
@@ -2182,12 +2281,20 @@ class MockTestApp {
                 this.updateProcessingStep(`✅ Medium dataset processing complete: ${validQuestions.length} valid questions`);
             } else {
                 // Filter and validate questions normally for smaller datasets
+                this.updateProgress(87, 'Validating questions');
                 validQuestions = this.validateAndFilterQuestions(questionsWithVisualData);
+            }
+            
+            // Check for cancellation before AI processing
+            if (this.pdfProcessingCancelled) {
+                this.updateProcessingStep('Processing cancelled by user');
+                return;
             }
             
             // AI Chapter Detection
             if (isAutoDetectEnabled && validQuestions.length > 0 && this.currentPDFMetadata.subject !== 'Mixed/Practice Books') {
                 this.updateProcessingStep('🤖 AI analyzing question content for chapter detection...');
+                this.updateProgress(90, 'AI chapter detection');
                 
                 const detectionResult = this.detectChapterFromContent(validQuestions, this.currentPDFMetadata.subject);
                 
@@ -2212,9 +2319,16 @@ class MockTestApp {
                 }
             }
             
+            // Check for cancellation before answer key detection
+            if (this.pdfProcessingCancelled) {
+                this.updateProcessingStep('Processing cancelled by user');
+                return;
+            }
+            
             // Enhanced Answer Key Auto-Detection
             if (validQuestions.length > 5) {
                 this.updateProcessingStep('🔍 Auto-detecting answer keys from PDF...');
+                this.updateProgress(95, 'Detecting answer keys');
                 
                 const answerKeyResult = this.autoDetectAndParseAnswerKeys(preprocessedText, validQuestions);
                 
@@ -2322,6 +2436,8 @@ class MockTestApp {
             
             if (validQuestions.length > 0) {
                 this.updateProcessingStep(`Successfully extracted ${validQuestions.length} questions!`);
+                this.updateProgress(100, `Complete - ${validQuestions.length} questions extracted`);
+                
                 setTimeout(() => {
                     // NEW: Create draft mock test instead of showing questions preview
                     this.createDraftMockTest(validQuestions);
@@ -2333,6 +2449,7 @@ class MockTestApp {
                 }, 1000);
             } else {
                 this.updateProcessingStep('No valid questions found.');
+                this.updateProgress(100, 'Processing complete - no questions found');
                 setTimeout(() => {
                     alert('No valid questions found in the PDF. The format might not be supported or the questions need manual formatting.');
                     this.showExtractionTips();
@@ -2358,10 +2475,19 @@ class MockTestApp {
 
         } catch (error) {
             console.error('Error processing PDF:', error);
-            this.updateProcessingStep('Error processing PDF.');
-            setTimeout(() => {
-                alert(`Error processing PDF: ${error.message}. Please try again or use a different file.`);
-            }, 1000);
+            this.updateProcessingStep(`Error processing PDF: ${error.message}`);
+            this.updateProgress(0, 'Processing failed');
+            
+            // Enhanced error handling for memory-related failures
+            if (error.message.includes('out of memory') || error.message.includes('memory') || error.name === 'RangeError') {
+                setTimeout(() => {
+                    alert(`⚠️ Memory error occurred during PDF processing. This PDF may be too large or complex. Try:\n\n1. Using a smaller PDF (fewer pages)\n2. Refreshing the page and trying again\n3. Splitting the PDF into smaller sections\n\nTechnical error: ${error.message}`);
+                }, 1000);
+            } else {
+                setTimeout(() => {
+                    alert(`Error processing PDF: ${error.message}. Please try again or use a different file.`);
+                }, 1000);
+            }
         } finally {
             setTimeout(() => {
                 if (processingDiv && !this.tempExtractedQuestions) {
@@ -2377,6 +2503,35 @@ class MockTestApp {
             stepElement.textContent = step;
         }
         console.log('Processing:', step);
+    }
+
+    updateProgress(percentage, message) {
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        
+        if (progressFill) {
+            progressFill.style.width = `${percentage}%`;
+        }
+        
+        if (progressText) {
+            progressText.textContent = `${percentage}% complete - ${message}`;
+        }
+    }
+
+    cancelPDFProcessing() {
+        this.pdfProcessingCancelled = true;
+        
+        const processingDiv = document.getElementById('processingStatus');
+        if (processingDiv) {
+            processingDiv.innerHTML = `
+                <div class="processing-indicator">
+                    <p>❌ PDF processing cancelled by user</p>
+                    <button onclick="document.getElementById('processingStatus').style.display='none'" class="btn btn--secondary">Close</button>
+                </div>
+            `;
+        }
+        
+        console.log('PDF processing cancelled by user');
     }
 
     reconstructPageText(pageItems) {
