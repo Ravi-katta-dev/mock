@@ -3658,6 +3658,9 @@ D) 6</pre>
             
             row.innerHTML = `
                 <td>
+                    <input type="checkbox" class="question-checkbox" value="${validatedQuestion.id}" onchange="app.updateDeleteButton()">
+                </td>
+                <td>
                     <div class="question-preview">
                         <span class="question-number">${index + 1}.</span>
                         ${validatedQuestion.text.substring(0, 100)}${validatedQuestion.text.length > 100 ? '...' : ''}
@@ -4189,6 +4192,74 @@ D) 6</pre>
         }
     }
 
+    // Bulk delete functionality
+    toggleSelectAll() {
+        const selectAllCheckbox = document.getElementById('selectAllQuestions');
+        const questionCheckboxes = document.querySelectorAll('.question-checkbox');
+        
+        questionCheckboxes.forEach(checkbox => {
+            checkbox.checked = selectAllCheckbox.checked;
+        });
+        
+        this.updateDeleteButton();
+    }
+
+    updateDeleteButton() {
+        const checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
+        const deleteButton = document.getElementById('deleteSelectedBtn');
+        const selectAllCheckbox = document.getElementById('selectAllQuestions');
+        const allCheckboxes = document.querySelectorAll('.question-checkbox');
+        
+        if (deleteButton) {
+            deleteButton.disabled = checkedBoxes.length === 0;
+            deleteButton.textContent = checkedBoxes.length === 0 ? 
+                '🗑️ Delete Selected' : 
+                `🗑️ Delete Selected (${checkedBoxes.length})`;
+        }
+        
+        // Update select all checkbox state
+        if (selectAllCheckbox && allCheckboxes.length > 0) {
+            if (checkedBoxes.length === 0) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = false;
+            } else if (checkedBoxes.length === allCheckboxes.length) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.indeterminate = true;
+                selectAllCheckbox.checked = false;
+            }
+        }
+    }
+
+    deleteSelectedQuestions() {
+        const checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
+        const selectedIds = Array.from(checkedBoxes).map(checkbox => checkbox.value);
+        
+        if (selectedIds.length === 0) {
+            alert('Please select at least one question to delete.');
+            return;
+        }
+        
+        const confirmMessage = `Are you sure you want to delete ${selectedIds.length} selected question(s)?\n\nThis action cannot be undone.`;
+        
+        if (confirm(confirmMessage)) {
+            this.questions = this.questions.filter(q => !selectedIds.includes(q.id));
+            this.saveQuestions();
+            this.renderQuestionBank();
+            this.updateDashboard();
+            
+            // Reset select all checkbox
+            const selectAllCheckbox = document.getElementById('selectAllQuestions');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+            
+            alert(`🗑️ Successfully deleted ${selectedIds.length} question(s)`);
+        }
+    }
+
     // Test Management Methods
     handleQuickAction(action) {
         switch(action) {
@@ -4251,13 +4322,13 @@ D) 6</pre>
             return null;
         }
 
-        // Define ideal proportions for RRB test
+        // Define ideal proportions for RRB test (exact RRB CBT pattern)
         const idealProportions = {
-            'Mathematics': 0.20,
-            'General Intelligence & Reasoning': 0.15,
-            'Basic Science & Engineering': 0.35,
-            'General Awareness': 0.10,
-            'Computer Applications': 0.20
+            'Mathematics': 0.20,                                    // 20 questions (20%)
+            'General Intelligence & Reasoning': 0.15,              // 15 questions (15%)
+            'Basic Science & Engineering': 0.35,                   // 35 questions (35%)
+            'General Awareness': 0.10,                             // 10 questions (10%)
+            'Basics of Computers and Applications': 0.20           // 20 questions (20%)
         };
 
         // Calculate adaptive test size (aim for 25-100 questions based on availability)
@@ -4276,7 +4347,7 @@ D) 6</pre>
 
         return {
             title: `Full Mock Test (${actualTotal} Questions)`,
-            duration: Math.max(30, Math.min(90, Math.ceil(actualTotal * 0.9))), // ~0.9 min per question
+            duration: 90, // Always 90 minutes as per RRB exam pattern
             subjects: subjects,
             totalQuestions: actualTotal,
             isAdaptive: true
@@ -4334,7 +4405,7 @@ D) 6</pre>
         
         return {
             title: `${subject} Test (${questionCount} Questions)`,
-            duration: Math.max(15, Math.min(30, Math.ceil(questionCount * 1.2))), // ~1.2 min per question
+            duration: 22.5, // Standard RRB subject-wise test duration (22.5 minutes for 25 questions)
             subjects: { [subject]: questionCount },
             totalQuestions: questionCount,
             isAdaptive: true
@@ -4601,13 +4672,13 @@ D) 6</pre>
         
         const subjectMappings = {
             // Computer/Applications variations
-            'Computer Applications': 'Computer Applications',
-            'Basics of Computers and Applications': 'Computer Applications',
-            'Computer Science': 'Computer Applications',
-            'Computers': 'Computer Applications',
-            'Computer Fundamentals': 'Computer Applications',
-            'IT': 'Computer Applications',
-            'Information Technology': 'Computer Applications',
+            'Computer Applications': 'Basics of Computers and Applications',
+            'Basics of Computers and Applications': 'Basics of Computers and Applications',
+            'Computer Science': 'Basics of Computers and Applications',
+            'Computers': 'Basics of Computers and Applications',
+            'Computer Fundamentals': 'Basics of Computers and Applications',
+            'IT': 'Basics of Computers and Applications',
+            'Information Technology': 'Basics of Computers and Applications',
             
             // Science variations
             'Basic Science & Engineering': 'Basic Science & Engineering',
@@ -5881,7 +5952,7 @@ D) 6</pre>
             }
             
             const subjects = ['Mathematics', 'General Intelligence & Reasoning', 
-                            'Basic Science & Engineering', 'General Awareness', 'Computer Applications'];
+                            'Basic Science & Engineering', 'General Awareness', 'Basics of Computers and Applications'];
             const subjectScores = subjects.map(subject => {
                 const subjectResults = userResults.map(result => {
                     const subjectQuestions = result.questions.filter(q => q.subject === subject);
@@ -5944,7 +6015,7 @@ D) 6</pre>
             
             const subjects = ['Mathematics', 'Reasoning', 'Basic Science', 'General Awareness', 'Computer Apps'];
             const fullSubjects = ['Mathematics', 'General Intelligence & Reasoning', 
-                                'Basic Science & Engineering', 'General Awareness', 'Computer Applications'];
+                                'Basic Science & Engineering', 'General Awareness', 'Basics of Computers and Applications'];
             
             const subjectScores = fullSubjects.map(subject => {
                 const subjectResults = userResults.map(result => {
