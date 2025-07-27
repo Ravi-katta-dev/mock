@@ -57,6 +57,14 @@
 
     <!-- Main Application -->
     <div id="mainApp" class="main-app hidden">
+        <!-- Theme Toggle -->
+        <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode"></button>
+        
+        <!-- Auto-save Indicator -->
+        <div class="auto-save-indicator" id="autoSaveIndicator">
+            <span id="autoSaveText">Saved</span>
+        </div>
+
         <!-- Header -->
         <header class="app-header">
             <div class="header-content">
@@ -213,13 +221,44 @@
 
             <!-- Test Interface -->
             <section id="testInterface" class="content-section test-interface">
+                <!-- Enhanced Progress Container -->
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar-section">
+                        <div class="progress-label">
+                            <span>Overall Progress</span>
+                            <span id="overallProgressText">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="overallProgressFill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="progress-stats">
+                        <div class="progress-stat">
+                            <div class="progress-stat-value" id="answeredCount">0</div>
+                            <div class="progress-stat-label">Answered</div>
+                        </div>
+                        <div class="progress-stat">
+                            <div class="progress-stat-value" id="markedCount">0</div>
+                            <div class="progress-stat-label">Marked</div>
+                        </div>
+                        <div class="progress-stat">
+                            <div class="progress-stat-value" id="remainingCount">0</div>
+                            <div class="progress-stat-label">Remaining</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="test-header">
                     <div class="test-info">
                         <h3 id="testTitle">Test Name</h3>
                         <span id="testProgress">Question 1 of 100</span>
                     </div>
-                    <div class="timer">
+                    <div class="timer" id="timerContainer">
                         <span id="timeRemaining">90:00</span>
+                        <div class="timer-controls">
+                            <button class="timer-btn" id="pauseTimer">⏸️</button>
+                            <button class="timer-btn" id="resumeTimer" disabled>▶️</button>
+                        </div>
                     </div>
                 </div>
 
@@ -231,14 +270,36 @@
                             <div class="question-options" id="questionOptions"></div>
                         </div>
                         
+                        <!-- Enhanced Confidence Selector -->
+                        <div class="confidence-selector" id="confidenceSelector">
+                            <div class="confidence-label">How confident are you with this answer?</div>
+                            <div class="confidence-options">
+                                <button class="confidence-btn" data-confidence="very-low">😰 Very Low</button>
+                                <button class="confidence-btn" data-confidence="low">😟 Low</button>
+                                <button class="confidence-btn" data-confidence="medium">😐 Medium</button>
+                                <button class="confidence-btn" data-confidence="high">😊 High</button>
+                                <button class="confidence-btn" data-confidence="very-high">😎 Very High</button>
+                            </div>
+                        </div>
+                        
                         <div class="question-actions">
-                            <button id="markForReview" class="btn btn--secondary">🔖 Mark for Review</button>
+                            <button id="markForReview" class="btn btn--secondary">🏷️ Mark for Review</button>
+                            <button id="flagQuestion" class="btn btn--outline">🚩 Flag Difficult</button>
                             <button id="clearResponse" class="btn btn--outline">🗑️ Clear Response</button>
                         </div>
                     </div>
 
                     <div class="question-palette">
-                        <h4>Question Palette</h4>
+                        <div class="palette-header">
+                            <h4>Question Palette</h4>
+                            <span id="paletteStats">0/0</span>
+                        </div>
+                        
+                        <!-- Enhanced Palette Search -->
+                        <div class="palette-search">
+                            <input type="text" id="paletteSearch" placeholder="🔍 Search questions...">
+                        </div>
+                        
                         <div class="palette-legend">
                             <span class="legend-item"><span class="status-indicator answered"></span>Answered</span>
                             <span class="legend-item"><span class="status-indicator not-answered"></span>Not Answered</span>

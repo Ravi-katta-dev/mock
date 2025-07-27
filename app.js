@@ -24,11 +24,25 @@ class MockTestApp {
         this.currentPDFMetadata = null;
         this.currentDraftMockTest = null;
         
+        // Enhanced UI state management
+        this.uiState = {
+            theme: localStorage.getItem('appTheme') || 'light',
+            autoSaveTimer: null,
+            timerPaused: false,
+            confidenceLevels: {},
+            flaggedQuestions: new Set(),
+            lastAutoSave: Date.now(),
+            keyboardShortcutsEnabled: true
+        };
+        
         // Initialize syllabus mapping for intelligent chapter detection
         this.initializeSyllabusMapping();
         
         // Initialize exam patterns for intelligent test generation
         this.initializeExamPatterns();
+        
+        // Initialize enhanced UI features
+        this.initializeEnhancedUI();
         
         // Initialize the application
         this.initializeApp();
@@ -368,6 +382,384 @@ class MockTestApp {
         };
         
         console.log('Exam patterns initialized:', Object.keys(this.examPatterns));
+    }
+
+    initializeEnhancedUI() {
+        // Initialize theme
+        this.applyTheme(this.uiState.theme);
+        
+        // Initialize auto-save system
+        this.setupAutoSave();
+        
+        // Initialize keyboard shortcuts
+        this.setupKeyboardShortcuts();
+        
+        // Initialize touch gestures for mobile
+        this.setupTouchGestures();
+    }
+
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        this.uiState.theme = theme;
+        localStorage.setItem('appTheme', theme);
+    }
+
+    setupAutoSave() {
+        // Auto-save every 30 seconds during tests
+        setInterval(() => {
+            if (this.testSession && this.testSession.active) {
+                this.autoSaveTestProgress();
+            }
+        }, 30000);
+    }
+
+    autoSaveTestProgress() {
+        if (!this.testSession) return;
+        
+        this.showAutoSaveIndicator('saving');
+        
+        // Save current test state
+        const testState = {
+            sessionId: this.testSession.id,
+            answers: this.testSession.answers,
+            markedQuestions: this.testSession.markedQuestions,
+            confidenceLevels: this.uiState.confidenceLevels,
+            flaggedQuestions: Array.from(this.uiState.flaggedQuestions),
+            currentQuestionIndex: this.testSession.currentQuestionIndex,
+            timeRemaining: this.testSession.timeRemaining,
+            lastSaved: Date.now()
+        };
+        
+        localStorage.setItem('testAutoSave_' + this.testSession.id, JSON.stringify(testState));
+        this.uiState.lastAutoSave = Date.now();
+        
+        setTimeout(() => {
+            this.showAutoSaveIndicator('saved');
+        }, 500);
+    }
+
+    showAutoSaveIndicator(status) {
+        const indicator = document.getElementById('autoSaveIndicator');
+        const text = document.getElementById('autoSaveText');
+        
+        if (!indicator || !text) return;
+        
+        indicator.className = `auto-save-indicator visible ${status}`;
+        text.textContent = status === 'saving' ? 'Saving...' : 'Saved';
+        
+        if (status === 'saved') {
+            setTimeout(() => {
+                indicator.classList.remove('visible');
+            }, 2000);
+        }
+    }
+
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (!this.uiState.keyboardShortcutsEnabled || e.target.matches('input, textarea')) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    this.previousQuestion();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    this.nextQuestion();
+                    break;
+                case 'm':
+                case 'M':
+                    e.preventDefault();
+                    this.toggleMarkForReview();
+                    break;
+                case 'f':
+                case 'F':
+                    e.preventDefault();
+                    this.toggleFlagQuestion();
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    this.toggleTimerPause();
+                    break;
+                case 'd':
+                case 'D':
+                    e.preventDefault();
+                    this.toggleTheme();
+                    break;
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                    e.preventDefault();
+                    this.selectOption(parseInt(e.key) - 1);
+                    break;
+            }
+        });
+    }
+
+    setupTouchGestures() {
+        let startX = 0;
+        let startY = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            if (!this.testSession) return;
+            
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+            
+            // Only process horizontal swipes
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    // Swipe left - next question
+                    this.nextQuestion();
+                } else {
+                    // Swipe right - previous question
+                    this.previousQuestion();
+                }
+            }
+        });
+    }
+
+    updateProgressIndicators() {
+        if (!this.testSession) return;
+        
+        const totalQuestions = this.testSession.questions.length;
+        const answeredCount = Object.keys(this.testSession.answers).length;
+        const markedCount = this.testSession.markedQuestions.size;
+        const remainingCount = totalQuestions - answeredCount;
+        const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
+        
+        // Update progress bar
+        const progressFill = document.getElementById('overallProgressFill');
+        const progressText = document.getElementById('overallProgressText');
+        
+        if (progressFill && progressText) {
+            progressFill.style.width = progressPercent + '%';
+            progressFill.classList.add('pulse');
+            setTimeout(() => progressFill.classList.remove('pulse'), 300);
+            progressText.textContent = progressPercent + '%';
+        }
+        
+        // Update stats
+        const answeredEl = document.getElementById('answeredCount');
+        const markedEl = document.getElementById('markedCount');
+        const remainingEl = document.getElementById('remainingCount');
+        
+        if (answeredEl) answeredEl.textContent = answeredCount;
+        if (markedEl) markedEl.textContent = markedCount;
+        if (remainingEl) remainingEl.textContent = remainingCount;
+        
+        // Update palette stats
+        const paletteStats = document.getElementById('paletteStats');
+        if (paletteStats) {
+            paletteStats.textContent = `${answeredCount}/${totalQuestions}`;
+        }
+    }
+
+    updateTimerDisplay(timeRemaining) {
+        const timerElement = document.getElementById('timeRemaining');
+        const timerContainer = document.getElementById('timerContainer');
+        
+        if (!timerElement || !timerContainer) return;
+        
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = timeRemaining % 60;
+        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        timerElement.textContent = timeString;
+        
+        // Add visual warnings
+        timerContainer.classList.remove('warning', 'critical');
+        
+        if (timeRemaining <= 60) { // Last minute
+            timerContainer.classList.add('critical');
+        } else if (timeRemaining <= 300) { // Last 5 minutes
+            timerContainer.classList.add('warning');
+        }
+        
+        // Show time warnings
+        if (timeRemaining === 900 || timeRemaining === 300 || timeRemaining === 60) {
+            this.showTimeWarning(timeRemaining);
+        }
+    }
+
+    showTimeWarning(timeRemaining) {
+        const minutes = Math.floor(timeRemaining / 60);
+        let message = '';
+        
+        if (minutes === 15) {
+            message = '⏰ 15 minutes remaining!';
+        } else if (minutes === 5) {
+            message = '⚠️ 5 minutes remaining!';
+        } else if (timeRemaining === 60) {
+            message = '🚨 1 minute remaining!';
+        }
+        
+        if (message) {
+            // You can implement a toast notification system here
+            console.log(message);
+            this.showAutoSaveIndicator('saving');
+            setTimeout(() => {
+                const indicator = document.getElementById('autoSaveIndicator');
+                const text = document.getElementById('autoSaveText');
+                if (indicator && text) {
+                    text.textContent = message.replace(/[⏰⚠️🚨]\s*/, '');
+                    indicator.classList.add('visible');
+                    setTimeout(() => indicator.classList.remove('visible'), 3000);
+                }
+            }, 100);
+        }
+    }
+
+    toggleTimerPause() {
+        if (!this.testSession) return;
+        
+        const pauseBtn = document.getElementById('pauseTimer');
+        const resumeBtn = document.getElementById('resumeTimer');
+        
+        if (this.uiState.timerPaused) {
+            // Resume timer
+            this.testSession.startTime = Date.now() - (this.testSession.duration * 60 * 1000 - this.testSession.timeRemaining * 1000);
+            this.uiState.timerPaused = false;
+            if (pauseBtn) pauseBtn.disabled = false;
+            if (resumeBtn) resumeBtn.disabled = true;
+        } else {
+            // Pause timer
+            this.uiState.timerPaused = true;
+            if (pauseBtn) pauseBtn.disabled = true;
+            if (resumeBtn) resumeBtn.disabled = false;
+        }
+    }
+
+    toggleTheme() {
+        const newTheme = this.uiState.theme === 'light' ? 'dark' : 'light';
+        this.applyTheme(newTheme);
+    }
+
+    toggleMarkForReview() {
+        if (!this.testSession) return;
+        
+        const currentIndex = this.testSession.currentQuestionIndex;
+        const questionId = this.testSession.questions[currentIndex].id;
+        
+        if (this.testSession.markedQuestions.has(questionId)) {
+            this.testSession.markedQuestions.delete(questionId);
+        } else {
+            this.testSession.markedQuestions.add(questionId);
+        }
+        
+        this.updateQuestionPalette();
+        this.updateProgressIndicators();
+        this.autoSaveTestProgress();
+    }
+
+    toggleFlagQuestion() {
+        if (!this.testSession) return;
+        
+        const currentIndex = this.testSession.currentQuestionIndex;
+        const questionId = this.testSession.questions[currentIndex].id;
+        
+        if (this.uiState.flaggedQuestions.has(questionId)) {
+            this.uiState.flaggedQuestions.delete(questionId);
+        } else {
+            this.uiState.flaggedQuestions.add(questionId);
+        }
+        
+        this.updateQuestionPalette();
+        this.autoSaveTestProgress();
+    }
+
+    selectOption(optionIndex) {
+        if (!this.testSession) return;
+        
+        const options = document.querySelectorAll('.question-option input[type="radio"]');
+        if (options[optionIndex]) {
+            options[optionIndex].click();
+        }
+    }
+
+    setConfidenceLevel(level) {
+        if (!this.testSession) return;
+        
+        const currentIndex = this.testSession.currentQuestionIndex;
+        const questionId = this.testSession.questions[currentIndex].id;
+        
+        this.uiState.confidenceLevels[questionId] = level;
+        
+        // Update UI
+        document.querySelectorAll('.confidence-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        const activeBtn = document.querySelector(`[data-confidence="${level}"]`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+        }
+        
+        this.autoSaveTestProgress();
+    }
+
+    filterQuestionPalette(searchTerm) {
+        if (!this.testSession) return;
+        
+        const paletteButtons = document.querySelectorAll('.palette-question');
+        const term = searchTerm.toLowerCase();
+        
+        paletteButtons.forEach((btn, index) => {
+            const question = this.testSession.questions[index];
+            const questionText = question.text.toLowerCase();
+            const shouldShow = !term || questionText.includes(term) || btn.textContent.includes(term);
+            
+            btn.style.display = shouldShow ? 'flex' : 'none';
+        });
+    }
+
+    updateQuestionPalette() {
+        if (!this.testSession) return;
+        
+        const paletteGrid = document.getElementById('questionPalette');
+        if (!paletteGrid) return;
+        
+        const currentIndex = this.testSession.currentQuestionIndex || this.testSession.currentQuestion;
+        
+        paletteGrid.innerHTML = this.testSession.questions.map((question, index) => {
+            const questionId = question.id;
+            const isAnswered = this.testSession.answers.hasOwnProperty(index);
+            const isMarked = this.testSession.markedQuestions.has(questionId);
+            const isFlagged = this.uiState.flaggedQuestions.has(questionId);
+            const isCurrent = index === currentIndex;
+            
+            let className = 'palette-question';
+            if (isCurrent) className += ' current';
+            else if (isAnswered) className += ' answered';
+            else className += ' not-answered';
+            
+            if (isMarked) className += ' marked';
+            if (isFlagged) className += ' flagged';
+            
+            return `
+                <div class="${className}" onclick="app.jumpToQuestion(${index})" title="Question ${index + 1}">
+                    ${index + 1}
+                </div>
+            `;
+        }).join('');
+    }
+
+    jumpToQuestion(questionIndex) {
+        if (!this.testSession || questionIndex < 0 || questionIndex >= this.testSession.questions.length) {
+            return;
+        }
+        
+        this.testSession.currentQuestion = questionIndex;
+        this.testSession.currentQuestionIndex = questionIndex;
+        this.renderQuestion();
     }
 
     initializeApp() {
@@ -868,6 +1260,35 @@ class MockTestApp {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.hideAllModals();
+            }
+        });
+
+        // Enhanced UI event listeners
+        this.setupElementListener('themeToggle', 'click', () => {
+            this.toggleTheme();
+        });
+
+        this.setupElementListener('pauseTimer', 'click', () => {
+            this.toggleTimerPause();
+        });
+
+        this.setupElementListener('resumeTimer', 'click', () => {
+            this.toggleTimerPause();
+        });
+
+        this.setupElementListener('flagQuestion', 'click', () => {
+            this.toggleFlagQuestion();
+        });
+
+        this.setupElementListener('paletteSearch', 'input', (e) => {
+            this.filterQuestionPalette(e.target.value);
+        });
+
+        // Confidence level buttons
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('confidence-btn')) {
+                const level = e.target.getAttribute('data-confidence');
+                this.setConfidenceLevel(level);
             }
         });
 
@@ -5545,11 +5966,20 @@ D) 6</pre>
             answers: new Array(selectedQuestions.length).fill(-1),
             timeSpent: new Array(selectedQuestions.length).fill(0),
             marked: new Array(selectedQuestions.length).fill(false),
+            markedQuestions: new Set(), // Enhanced marking system
             currentQuestion: 0,
+            currentQuestionIndex: 0,
             startTime: Date.now(),
             duration: config.duration * 60 * 1000, // Convert to milliseconds
-            questionStartTime: Date.now()
+            timeRemaining: config.duration * 60, // In seconds for display
+            questionStartTime: Date.now(),
+            active: true
         };
+
+        // Reset enhanced UI state for new test
+        this.uiState.confidenceLevels = {};
+        this.uiState.flaggedQuestions = new Set();
+        this.uiState.timerPaused = false;
 
         console.log('Test session created:', {
             id: this.testSession.id,
@@ -5999,12 +6429,23 @@ D) 6</pre>
         }
         
         this.testSession.timer = setInterval(() => {
+            // Skip timer update if paused
+            if (this.uiState.timerPaused) {
+                return;
+            }
+            
             const remaining = endTime - Date.now();
             
             if (remaining <= 0) {
                 this.submitTest();
                 return;
             }
+            
+            const remainingSeconds = Math.floor(remaining / 1000);
+            this.testSession.timeRemaining = remainingSeconds;
+            
+            // Use enhanced timer display
+            this.updateTimerDisplay(remainingSeconds);
             
             const minutes = Math.floor(remaining / 60000);
             const seconds = Math.floor((remaining % 60000) / 1000);
@@ -6063,13 +6504,16 @@ D) 6</pre>
                 option : 
                 this.renderMathematicalExpressions(option);
             
+            const isSelected = this.testSession.answers[this.testSession.currentQuestion] === index;
+            
             return `
-                <div class="option ${this.testSession.answers[this.testSession.currentQuestion] === index ? 'selected' : ''}" 
+                <div class="question-option ${isSelected ? 'selected' : ''}" 
                      onclick="app.selectOption(${index})">
                     <input type="radio" name="question_${this.testSession.currentQuestion}" 
-                           value="${index}" ${this.testSession.answers[this.testSession.currentQuestion] === index ? 'checked' : ''}>
+                           value="${index}" ${isSelected ? 'checked' : ''}>
                     <span class="option-label">${String.fromCharCode(65 + index)}.</span>
                     <span class="option-text tex2jax_process">${mathRenderedOption}</span>
+                    <div class="option-feedback">Selected</div>
                 </div>
             `;
         }).join('');
@@ -6099,10 +6543,37 @@ D) 6</pre>
         // Update mark for review button
         const markBtn = document.getElementById('markForReview');
         if (markBtn) {
-            const isMarked = this.testSession.marked[this.testSession.currentQuestion];
+            const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
+            const isMarked = this.testSession.markedQuestions.has(questionId);
             markBtn.textContent = isMarked ? '🏷️ Unmark for Review' : '🏷️ Mark for Review';
             markBtn.className = `btn ${isMarked ? 'btn--warning' : 'btn--secondary'}`;
         }
+
+        // Update flag button
+        const flagBtn = document.getElementById('flagQuestion');
+        if (flagBtn) {
+            const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
+            const isFlagged = this.uiState.flaggedQuestions.has(questionId);
+            flagBtn.textContent = isFlagged ? '🚩 Unflag' : '🚩 Flag Difficult';
+            flagBtn.className = `btn ${isFlagged ? 'btn--warning' : 'btn--outline'}`;
+        }
+
+        // Update confidence selector
+        const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
+        const currentConfidence = this.uiState.confidenceLevels[questionId];
+        
+        document.querySelectorAll('.confidence-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-confidence') === currentConfidence) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Update progress indicators
+        this.updateProgressIndicators();
+        
+        // Update question palette
+        this.updateQuestionPalette();
 
         // Record question start time for analytics
         this.testSession.questionStartTime = Date.now();
@@ -6115,8 +6586,23 @@ D) 6</pre>
             this.testSession.timeSpent[this.testSession.currentQuestion] = timeSpent;
             
             this.testSession.answers[this.testSession.currentQuestion] = optionIndex;
+            
+            // Enhanced UI feedback
             this.renderQuestion();
             this.renderQuestionPalette();
+            this.updateProgressIndicators();
+            
+            // Auto-save progress
+            this.autoSaveTestProgress();
+            
+            // Add visual feedback
+            const selectedOption = document.querySelector(`.question-option:nth-child(${optionIndex + 1})`);
+            if (selectedOption) {
+                selectedOption.style.transform = 'scale(1.02)';
+                setTimeout(() => {
+                    selectedOption.style.transform = '';
+                }, 200);
+            }
         }
     }
 
