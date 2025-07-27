@@ -110,7 +110,8 @@ class MockTestApp {
             'testEngine',
             'resultsAnalyzer',
             'pdfProcessor',
-            'answerKeyDetector'
+            'answerKeyDetector',
+            'questionBank'
         ];
 
         for (const moduleName of modules) {
@@ -135,7 +136,8 @@ class MockTestApp {
             testEngine: window.TestEngine,
             resultsAnalyzer: window.ResultsAnalyzer,
             pdfProcessor: window.pdfProcessor,
-            answerKeyDetector: window.answerKeyDetector
+            answerKeyDetector: window.answerKeyDetector,
+            questionBank: window.QuestionBank
         };
 
         const module = moduleMap[moduleName];

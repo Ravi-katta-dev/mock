@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RRB Technician Grade-3 Signal Mock Test</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/themes.css">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="stylesheet" href="css/test-interface.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -643,8 +645,16 @@
     <script src="js/config/syllabusMapping.js"></script>
     <script src="js/config/examPatterns.js"></script>
     
+    <!-- Utility Modules (loaded first for error handling) -->
+    <script src="js/utils/ErrorHandler.js"></script>
+    <script src="js/utils/PerformanceMonitor.js"></script>
+    <script src="js/utils/MathRenderer.js"></script>
+    <script src="js/utils/QuestionExtractor.js"></script>
+    <script src="js/utils/UIHelpers.js"></script>
+    
     <!-- Core Modules -->
     <script src="js/core/DataManager.js"></script>
+    <script src="js/core/MockTestApp.js"></script>
     
     <!-- Feature Modules -->
     <script src="js/modules/QuestionManager.js"></script>
@@ -655,8 +665,8 @@
     <script src="js/modules/AnswerKeyDetector.js"></script>
     <script src="js/modules/UserManager.js"></script>
     
-    <!-- Utility Modules -->
-    <script src="js/utils/UIHelpers.js"></script>
+    <!-- Component Modules -->
+    <script src="js/components/QuestionBank.js"></script>
 
     <!-- Main Application -->
     <script src="app.js"></script>

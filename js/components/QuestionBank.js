@@ -124,7 +124,7 @@ class QuestionBank {
             return;
         }
 
-        const allQuestions = questionManager.getAllQuestions();
+        const allQuestions = questionManager.getQuestions();
         const filteredQuestions = this.filterQuestions(allQuestions);
         const sortedQuestions = this.sortQuestions(filteredQuestions);
 
