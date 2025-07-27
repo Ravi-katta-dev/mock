@@ -3351,138 +3351,46 @@ class MockTestApp {
             return;
         }
 
-        // Initialize cancellation flag
-        this.pdfProcessingCancelled = false;
-
-        // CRITICAL FIX: Capture form values IMMEDIATELY at the start
-        const subjectElement = document.getElementById('pdfSubject');
-        const chapterElement = document.getElementById('pdfChapter');
-        const chapterCustomElement = document.getElementById('pdfChapterCustom');
-        const autoDetectElement = document.getElementById('autoDetectChapter');
-        const enableVisualDetectionElement = document.getElementById('enableVisualDetection');
-        
-        console.log('Form elements found:', {
-            subjectElement: !!subjectElement,
-            chapterElement: !!chapterElement,
-            chapterCustomElement: !!chapterCustomElement,
-            subjectValue: subjectElement?.value,
-            chapterValue: chapterElement?.value,
-            chapterCustomValue: chapterCustomElement?.value,
-            visualDetectionEnabled: enableVisualDetectionElement?.checked
-        });
-
-        if (!subjectElement?.value || subjectElement.value === '') {
-            alert('Please select a subject for the PDF questions.');
-            subjectElement?.focus();
-            return;
-        }
-        
-        // Get chapter value from appropriate input
-        let chapterValue = '';
-        if (chapterElement && chapterElement.style.display !== 'none' && chapterElement.value) {
-            chapterValue = chapterElement.value;
-        } else if (chapterCustomElement && chapterCustomElement.value?.trim()) {
-            chapterValue = chapterCustomElement.value.trim();
-        }
-        
-        const isAutoDetectEnabled = autoDetectElement?.checked !== false;
-        const isVisualDetectionEnabled = enableVisualDetectionElement?.checked !== false;
-        
-        // For auto-detection or mixed subjects, we can proceed without chapter initially
-        if (!chapterValue && !isAutoDetectEnabled && subjectElement.value !== 'Mixed/Practice Books') {
-            alert('Please enter a chapter/topic for the PDF questions or enable auto-detection.');
-            (chapterCustomElement || chapterElement)?.focus();
-            return;
-        }
-
-        // STORE VALUES IMMEDIATELY - This is the critical fix
+        // Store form values to prevent loss
         this.currentPDFMetadata = {
-            subject: subjectElement.value,
-            chapter: chapterValue || 'Auto-detect',
+            subject: document.getElementById('pdfSubject')?.value || '',
+            chapter: document.getElementById('pdfChapterCustom')?.value?.trim() || 
+                    document.getElementById('pdfChapter')?.value || 'Auto-detect',
             filename: this.currentPDFFile.name,
-            autoDetect: isAutoDetectEnabled,
-            visualDetection: isVisualDetectionEnabled
+            autoDetect: document.getElementById('autoDetectChapter')?.checked !== false,
+            visualDetection: document.getElementById('enableVisualDetection')?.checked !== false
         };
 
-        console.log('Stored PDF metadata:', this.currentPDFMetadata);
-
-        const processingDiv = document.getElementById('processingStatus');
-        if (processingDiv) {
-            processingDiv.innerHTML = `
-                <div class="processing-indicator">
-                    <div class="spinner"></div>
-                    <p>Processing PDF: ${this.currentPDFFile.name}</p>
-                    <p>Subject: <strong>${this.currentPDFMetadata.subject}</strong></p>
-                    <p>Chapter: <strong>${this.currentPDFMetadata.chapter}</strong></p>
-                    ${isAutoDetectEnabled ? '<p>🤖 AI Chapter Detection: <strong>Enabled</strong></p>' : ''}
-                    ${isVisualDetectionEnabled ? '<p>🎨 Visual Highlight Detection: <strong>Enabled</strong></p>' : ''}
-                    <div class="progress-details">
-                        <p id="processingStep">Initializing PDF processing...</p>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-                        </div>
-                        <p id="progressText">0% complete</p>
-                    </div>
-                    <div class="processing-controls">
-                        <button id="cancelPDFProcessing" class="btn btn--secondary">🛑 Cancel Processing</button>
-                    </div>
-                </div>
-            `;
-            processingDiv.style.display = 'block';
-
-            // Add cancel button functionality
-            const cancelBtn = document.getElementById('cancelPDFProcessing');
-            if (cancelBtn) {
-                cancelBtn.addEventListener('click', () => {
-                    this.cancelPDFProcessing();
-                });
-            }
-        }
+        // Show processing UI with cancel option
+        this.showProcessingUI();
 
         try {
             this.updateProcessingStep('Loading PDF document...');
-            this.updateProgress(5, 'PDF document loaded');
             
             const fileArrayBuffer = await this.currentPDFFile.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(fileArrayBuffer).promise;
             
-            this.updateProcessingStep('Extracting text from pages...');
-            this.updateProgress(10, 'Starting page extraction');
-            
-            let fullText = '';
-            let pageTexts = [];
+            // Process in manageable chunks to prevent memory issues
+            const CHUNK_SIZE = 5;
+            const results = [];
             let pageVisualData = [];
             
-            // Chunked processing implementation: Process pages in chunks of 5
-            const CHUNK_SIZE = 5;
-            const totalPages = pdf.numPages;
-            let processedPages = 0;
-
-            for (let chunkStart = 1; chunkStart <= totalPages; chunkStart += CHUNK_SIZE) {
-                // Check for cancellation
-                if (this.pdfProcessingCancelled) {
-                    this.updateProcessingStep('Processing cancelled by user');
+            for (let i = 1; i <= pdf.numPages; i += CHUNK_SIZE) {
+                const endPage = Math.min(i + CHUNK_SIZE - 1, pdf.numPages);
+                this.updateProcessingStep(`Processing pages ${i} to ${endPage} of ${pdf.numPages}...`);
+                
+                // Check for user cancellation
+                if (this.cancelProcessing) {
+                    this.updateProcessingStep("Operation cancelled by user");
                     return;
                 }
-
-                const chunkEnd = Math.min(chunkStart + CHUNK_SIZE - 1, totalPages);
-                const chunkNumber = Math.floor((chunkStart - 1) / CHUNK_SIZE) + 1;
-                const totalChunks = Math.ceil(totalPages / CHUNK_SIZE);
                 
-                this.updateProcessingStep(`Processing chunk ${chunkNumber}/${totalChunks} (pages ${chunkStart}-${chunkEnd})...`);
-                
-                // Process pages in current chunk
-                let chunkPages = [];
-                for (let i = chunkStart; i <= chunkEnd; i++) {
-                    if (this.pdfProcessingCancelled) {
-                        this.updateProcessingStep('Processing cancelled by user');
-                        return;
-                    }
-
-                    const page = await pdf.getPage(i);
+                // Process chunk
+                const chunkPages = [];
+                for (let j = i; j <= endPage; j++) {
+                    const page = await pdf.getPage(j);
                     const textContent = await page.getTextContent();
                     
-                    // Get text with position information for better parsing
                     const pageItems = textContent.items.map(item => ({
                         text: item.str,
                         x: item.transform[4],
@@ -3492,376 +3400,119 @@ class MockTestApp {
                     }));
                     
                     const pageText = this.reconstructPageText(pageItems);
-                    pageTexts.push(pageText);
-                    fullText += pageText + '\n\n--- PAGE_BREAK ---\n\n';
-                    
-                    // Extract visual highlight data for each page
-                    this.updateProcessingStep(`Processing page ${i} of ${totalPages} (chunk ${chunkNumber}/${totalChunks})...`);
-                    const visualData = await this.extractPageVisualData(page, pageItems);
-                    pageVisualData.push(visualData);
-                    
-                    // Explicitly cleanup page object after use
-                    if (page.cleanup && typeof page.cleanup === 'function') {
-                        page.cleanup();
-                    }
-                    
-                    processedPages++;
-                    const progress = Math.round((processedPages / totalPages) * 60) + 10; // 10-70% for page processing
-                    this.updateProgress(progress, `Processed ${processedPages}/${totalPages} pages`);
-                }
-                
-                // Memory management: Add delay between chunks and trigger garbage collection
-                if (chunkEnd < totalPages) {
-                    this.updateProcessingStep(`Chunk ${chunkNumber} complete. Optimizing memory...`);
-                    
-                    // Trigger garbage collection hint if available
-                    if (window.gc) {
-                        window.gc();
-                    }
-                    
-                    // Add delay to allow UI updates and memory cleanup
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-            }
-
-            // Check for cancellation before continuing
-            if (this.pdfProcessingCancelled) {
-                this.updateProcessingStep('Processing cancelled by user');
-                return;
-            }
-
-            this.updateProcessingStep('Analyzing question structure...');
-            this.updateProgress(70, 'Text extraction complete, analyzing structure');
-            
-            // Enhanced text preprocessing
-            const preprocessedText = this.preprocessPDFText(fullText);
-            
-            this.updateProcessingStep('🔍 Extracting questions using enhanced strategies (layout-aware, table detection, multi-column support)...');
-            this.updateProgress(75, 'Question extraction in progress');
-            
-            // Multiple extraction strategies
-            const extractedQuestions = this.extractQuestionsWithMultipleStrategies(preprocessedText, pageTexts);
-            
-            let questionsWithVisualData = extractedQuestions;
-            
-            // Apply visual highlight detection if enabled
-            if (isVisualDetectionEnabled) {
-                if (this.pdfProcessingCancelled) {
-                    this.updateProcessingStep('Processing cancelled by user');
-                    return;
-                }
-                this.updateProcessingStep('Applying visual highlight detection...');
-                this.updateProgress(80, 'Applying visual detection');
-                questionsWithVisualData = this.applyVisualHighlightDetection(extractedQuestions, pageVisualData);
-            } else {
-                console.log('📊 Visual highlight detection disabled by user');
-            }
-            
-            if (this.pdfProcessingCancelled) {
-                this.updateProcessingStep('Processing cancelled by user');
-                return;
-            }
-
-            this.updateProcessingStep('Validating extracted questions...');
-            this.updateProgress(85, 'Validating questions');
-            console.log('PDF metadata before validation:', this.currentPDFMetadata);
-            
-            // CRITICAL FIX: Declare validQuestions variable
-            let validQuestions;
-            
-            // Enhanced processing with optimized chunking for very large datasets (1500+ questions)
-            if (questionsWithVisualData.length > 1000) {
-                this.updateProcessingStep(`🚀 Large dataset detected: ${questionsWithVisualData.length} questions. Applying advanced optimizations...`);
-                this.updateProgress(87, 'Processing large dataset');
-                
-                // Smaller batch size for very large datasets to prevent memory issues
-                const batchSize = 50;
-                let processedQuestions = [];
-                
-                for (let i = 0; i < questionsWithVisualData.length; i += batchSize) {
-                    // Check for cancellation
-                    if (this.pdfProcessingCancelled) {
-                        this.updateProcessingStep('Processing cancelled by user');
-                        return;
-                    }
-
-                    const batch = questionsWithVisualData.slice(i, i + batchSize);
-                    const batchNumber = Math.floor(i / batchSize) + 1;
-                    const totalBatches = Math.ceil(questionsWithVisualData.length / batchSize);
-                    
-                    this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
-                    
-                    // Longer delay for very large datasets to allow UI updates
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    const validatedBatch = this.validateAndFilterQuestions(batch);
-                    processedQuestions.push(...validatedBatch);
-                    
-                    // Update progress with memory usage info
-                    const progress = Math.round((i + batch.length) / questionsWithVisualData.length * 100);
-                    this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions, batch ${batchNumber}/${totalBatches})`);
-                    
-                    // Memory management for very large datasets
-                    if (batchNumber % 10 === 0) {
-                        // Trigger garbage collection hint every 10 batches
-                        if (window.gc) window.gc();
-                        this.updateProcessingStep(`🧹 Memory optimization applied...`);
-                    }
-                }
-                
-                validQuestions = processedQuestions;
-                this.updateProcessingStep(`✅ Large dataset processing complete: ${validQuestions.length} valid questions extracted`);
-                
-            } else if (questionsWithVisualData.length > 500) {
-                this.updateProcessingStep(`🔄 Processing medium dataset: ${questionsWithVisualData.length} questions found. Implementing optimizations...`);
-                this.updateProgress(87, 'Processing medium dataset');
-                
-                // Process in batches for better performance
-                const batchSize = 100;
-                let processedQuestions = [];
-                
-                for (let i = 0; i < questionsWithVisualData.length; i += batchSize) {
-                    // Check for cancellation
-                    if (this.pdfProcessingCancelled) {
-                        this.updateProcessingStep('Processing cancelled by user');
-                        return;
-                    }
-
-                    const batch = questionsWithVisualData.slice(i, i + batchSize);
-                    const batchNumber = Math.floor(i / batchSize) + 1;
-                    const totalBatches = Math.ceil(questionsWithVisualData.length / batchSize);
-                    
-                    this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
-                    
-                    // Add small delay to prevent UI blocking
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                    
-                    const validatedBatch = this.validateAndFilterQuestions(batch);
-                    processedQuestions.push(...validatedBatch);
-                    
-                    // Update progress
-                    const progress = Math.round((i + batch.length) / questionsWithVisualData.length * 100);
-                    this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions processed)`);
-                }
-                
-                validQuestions = processedQuestions;
-                this.updateProcessingStep(`✅ Medium dataset processing complete: ${validQuestions.length} valid questions`);
-            } else {
-                // Filter and validate questions normally for smaller datasets
-                this.updateProgress(87, 'Validating questions');
-                validQuestions = this.validateAndFilterQuestions(questionsWithVisualData);
-            }
-            
-            // Check for cancellation before AI processing
-            if (this.pdfProcessingCancelled) {
-                this.updateProcessingStep('Processing cancelled by user');
-                return;
-            }
-            
-            // AI Chapter Detection
-            if (isAutoDetectEnabled && validQuestions.length > 0 && this.currentPDFMetadata.subject !== 'Mixed/Practice Books') {
-                this.updateProcessingStep('🤖 AI analyzing question content for chapter detection...');
-                this.updateProgress(90, 'AI chapter detection');
-                
-                const detectionResult = this.detectChapterFromContent(validQuestions, this.currentPDFMetadata.subject);
-                
-                if (detectionResult && detectionResult.confidence > 30) {
-                    // Update metadata with detected chapter
-                    if (!chapterValue || chapterValue === 'Auto-detect') {
-                        this.currentPDFMetadata.chapter = detectionResult.chapter;
-                        this.currentPDFMetadata.detectionConfidence = detectionResult.confidence;
-                        
-                        // Re-process questions with detected chapter
-                        validQuestions = validQuestions.map(q => ({
-                            ...q,
-                            chapter: detectionResult.chapter,
-                            aiDetected: true
-                        }));
-                        
-                        console.log(`AI detected chapter: ${detectionResult.chapter} (${detectionResult.confidence}% confidence)`);
-                    }
-                    
-                    // Store detection result for showing suggestions
-                    this.lastDetectionResult = detectionResult;
-                }
-            }
-            
-            // Check for cancellation before answer key detection
-            if (this.pdfProcessingCancelled) {
-                this.updateProcessingStep('Processing cancelled by user');
-                return;
-            }
-            
-            // Enhanced Answer Key Auto-Detection
-            if (validQuestions.length > 5) {
-                this.updateProcessingStep('🔍 Auto-detecting answer keys from PDF...');
-                this.updateProgress(95, 'Detecting answer keys');
-                
-                const answerKeyResult = this.autoDetectAndParseAnswerKeys(preprocessedText, validQuestions);
-                
-                if (answerKeyResult.success) {
-                    this.updateProcessingStep(`✅ Answer key detected! Applied answers to ${answerKeyResult.appliedAnswers} questions (${answerKeyResult.confidence}% confidence)`);
-                    
-                    // Update questions with mathematical rendering
-                    validQuestions = validQuestions.map(q => ({
-                        ...q,
-                        text: this.renderMathematicalExpressions(q.text),
-                        options: q.options.map(opt => this.renderMathematicalExpressions(opt)),
-                        hasAutoAnswer: q.answerSource === 'auto-detected',
-                        mathRendered: true
-                    }));
-                } else {
-                    this.updateProcessingStep('⚠️ No answer key detected - questions will need manual review');
-                    
-                    // Still apply mathematical rendering
-                    validQuestions = validQuestions.map(q => ({
-                        ...q,
-                        text: this.renderMathematicalExpressions(q.text),
-                        options: q.options.map(opt => this.renderMathematicalExpressions(opt)),
-                        mathRendered: true
-                    }));
-                }
-            }
-            
-            // Extract and associate images with questions
-            if (validQuestions.length > 0) {
-                this.updateProcessingStep('🖼️ Processing image references...');
-                validQuestions = this.associateImagesWithQuestions(validQuestions, []);
-            }
-            
-            // Handle Mixed/Practice Books - detect individual question subjects/chapters
-            if (this.currentPDFMetadata.subject === 'Mixed/Practice Books' && validQuestions.length > 0) {
-                this.updateProcessingStep('🔍 Analyzing mixed content for individual subjects...');
-                
-                // NEW: Check if this is a practice sets PDF
-                this.updateProcessingStep('📚 Detecting practice sets structure...');
-                const practiceSets = this.detectPracticeSets(preprocessedText);
-                
-                if (practiceSets.length > 1) {
-                    // This is a practice sets PDF - handle differently
-                    this.updateProcessingStep(`✅ Detected ${practiceSets.length} practice sets!`);
-                    
-                    // Store practice sets for later processing
-                    this.tempExtractedPracticeSets = practiceSets;
-                    this.tempExtractedQuestions = null; // Clear individual questions
-                    
-                    setTimeout(() => {
-                        this.showPracticeSetsPreview(practiceSets);
-                    }, 1000);
-                    
-                    return;
-                } else {
-                    // Regular mixed content processing
-                    validQuestions = validQuestions.map((question, index) => {
-                        // Try to detect subject for each question
-                        let detectedSubject = 'General';
-                        let detectedChapter = chapterValue || 'Mixed Practice';
-                        
-                        const questionText = (question.text || '').toLowerCase();
-                        const optionsText = (question.options || []).join(' ').toLowerCase();
-                        const fullQuestionText = questionText + ' ' + optionsText;
-                        
-                        // Subject detection logic
-                        Object.keys(this.syllabusMapping).forEach(subject => {
-                            if (subject === 'Mixed/Practice Books') return;
-                            
-                            const keywords = this.syllabusMapping[subject].keywords;
-                            let subjectScore = 0;
-                            
-                            Object.keys(keywords).forEach(chapter => {
-                                keywords[chapter].forEach(keyword => {
-                                    if (fullQuestionText.includes(keyword.toLowerCase())) {
-                                        subjectScore++;
-                                    }
-                                });
-                            });
-                            
-                            if (subjectScore > 2) { // Threshold for subject detection
-                                detectedSubject = subject;
-                                
-                                // Try to detect specific chapter within the subject
-                                const chapterDetection = this.detectChapterFromContent([question], subject);
-                                if (chapterDetection && chapterDetection.confidence > 20) {
-                                    detectedChapter = chapterDetection.chapter;
-                                }
-                            }
-                        });
-                        
-                        return {
-                            ...question,
-                            subject: detectedSubject,
-                            chapter: detectedChapter,
-                            originalSubject: 'Mixed/Practice Books',
-                            aiDetected: true
-                        };
+                    chunkPages.push({
+                        number: j,
+                        text: this.preprocessPDFText(pageText),
+                        items: pageItems
                     });
+                    
+                    // Extract visual data for answer detection
+                    if (this.currentPDFMetadata.visualDetection) {
+                        const visualData = await this.extractPageVisualData(page, pageItems);
+                        pageVisualData.push(visualData);
+                    }
+                    
+                    // Force cleanup
+                    page.cleanup();
+                }
+                
+                // Extract questions from this chunk
+                const chunkText = chunkPages.map(p => p.text).join('\n\n--- PAGE_BREAK ---\n\n');
+                const chunkQuestions = this.extractQuestionsWithMultipleStrategies(chunkText, chunkPages.map(p => p.text));
+                
+                results.push(...chunkQuestions);
+                
+                // Allow UI to update and garbage collection
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Clear references
+                chunkPages.length = 0;
+                
+                // Force garbage collection hint
+                if (window.gc) {
+                    window.gc();
                 }
             }
             
-            console.log('PDF metadata after validation:', this.currentPDFMetadata);
-            console.log('Sample of finalized questions:', validQuestions.slice(0, 2));
-            
-            if (validQuestions.length > 0) {
-                this.updateProcessingStep(`Successfully extracted ${validQuestions.length} questions!`);
-                this.updateProgress(100, `Complete - ${validQuestions.length} questions extracted`);
-                
-                setTimeout(() => {
-                    // NEW: Create draft mock test instead of showing questions preview
-                    this.createDraftMockTest(validQuestions);
-                    
-                    // Show chapter suggestions if AI detection was used
-                    if (isAutoDetectEnabled && this.lastDetectionResult && this.currentPDFMetadata.subject !== 'Mixed/Practice Books') {
-                        this.showChapterSuggestions(this.lastDetectionResult, validQuestions);
-                    }
-                }, 1000);
-            } else {
-                this.updateProcessingStep('No valid questions found.');
-                this.updateProgress(100, 'Processing complete - no questions found');
-                setTimeout(() => {
-                    alert('No valid questions found in the PDF. The format might not be supported or the questions need manual formatting.');
-                    this.showExtractionTips();
-                }, 1000);
-            }
-
-            // Store PDF information
-            const pdfInfo = {
-                id: 'pdf_' + Date.now(),
-                name: this.currentPDFFile.name,
-                size: this.currentPDFFile.size,
-                subject: this.currentPDFMetadata.subject,
-                chapter: this.currentPDFMetadata.chapter,
-                uploadDate: new Date().toISOString(),
-                questionsExtracted: validQuestions.length,
-                totalPages: pdf.numPages,
-                data: fileArrayBuffer,
-                aiDetected: this.currentPDFMetadata.detectionConfidence || false
-            };
-
-            this.uploadedPDFs.push(pdfInfo);
-            this.savePDFs();
+            // Process results
+            this.processExtractedQuestions(results, pageVisualData);
 
         } catch (error) {
             console.error('Error processing PDF:', error);
-            this.updateProcessingStep(`Error processing PDF: ${error.message}`);
-            this.updateProgress(0, 'Processing failed');
-            
-            // Enhanced error handling for memory-related failures
-            if (error.message.includes('out of memory') || error.message.includes('memory') || error.name === 'RangeError') {
-                setTimeout(() => {
-                    alert(`⚠️ Memory error occurred during PDF processing. This PDF may be too large or complex. Try:\n\n1. Using a smaller PDF (fewer pages)\n2. Refreshing the page and trying again\n3. Splitting the PDF into smaller sections\n\nTechnical error: ${error.message}`);
-                }, 1000);
-            } else {
-                setTimeout(() => {
-                    alert(`Error processing PDF: ${error.message}. Please try again or use a different file.`);
-                }, 1000);
-            }
+            this.updateProcessingStep(`Error: ${error.message}`);
+            this.handleProcessingError(error);
         } finally {
-            setTimeout(() => {
-                if (processingDiv && !this.tempExtractedQuestions) {
-                    processingDiv.style.display = 'none';
-                }
-            }, 2000);
+            this.cleanup();
         }
+    }
+
+    showProcessingUI() {
+        const processingDiv = document.getElementById('processingStatus');
+        if (processingDiv) {
+            processingDiv.innerHTML = `
+                <div class="processing-indicator">
+                    <div class="spinner"></div>
+                    <p>Processing PDF: ${this.currentPDFFile.name}</p>
+                    <div class="progress-details">
+                        <p id="processingStep">Initializing PDF processing...</p>
+                    </div>
+                    <button id="cancelPDFProcessingBtn" class="btn btn--secondary">Cancel</button>
+                </div>
+            `;
+            processingDiv.style.display = 'block';
+        }
+
+        // Add cancel functionality
+        this.cancelProcessing = false;
+        document.getElementById('cancelPDFProcessingBtn')?.addEventListener('click', () => {
+            this.cancelProcessing = true;
+            this.updateProcessingStep("Cancelling operation...");
+        });
+    }
+
+    processExtractedQuestions(results, pageVisualData) {
+        // Filter and validate questions
+        const validQuestions = this.validateAndFilterQuestions(results);
+        
+        if (validQuestions.length > 0) {
+            // Apply visual highlight detection if enabled
+            if (this.currentPDFMetadata.visualDetection && pageVisualData.length > 0) {
+                const questionsWithVisualData = this.applyVisualHighlightDetection(validQuestions, pageVisualData);
+                this.addQuestionsToBank(questionsWithVisualData);
+            } else {
+                this.addQuestionsToBank(validQuestions);
+            }
+            
+            // Show success message
+            const message = this.buildSuccessMessage(validQuestions, [], Date.now() - this.startTime);
+            alert(message);
+        } else {
+            alert('No valid questions found in the PDF.');
+        }
+    }
+
+    addQuestionsToBank(validQuestions) {
+        // Add questions to the main question bank
+        validQuestions.forEach(question => {
+            const questionData = this.validateQuestionData({
+                ...question,
+                id: 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                subject: this.currentPDFMetadata.subject,
+                chapter: this.currentPDFMetadata.chapter,
+                source: 'PDF_Upload',
+                extractionSource: this.currentPDFMetadata.filename
+            });
+            
+            this.questions.push(questionData);
+        });
+        
+        this.saveQuestions();
+        this.loadQuestionBank();
+    }
+
+    handleProcessingError(error) {
+        const message = this.buildErrorMessage(error, '');
+        alert(message);
     }
 
     updateProcessingStep(step) {
@@ -8763,13 +8414,29 @@ D) 6</pre>
         }
         
         // Destroy charts
-        Object.values(this.charts).forEach(chart => {
+        Object.values(this.charts || {}).forEach(chart => {
             if (chart && typeof chart.destroy === 'function') {
                 chart.destroy();
             }
         });
         
-        console.log('App cleanup completed');
+        // Clear PDF references
+        if (this.currentPDF) {
+            this.currentPDF.destroy();
+            this.currentPDF = null;
+        }
+        
+        // Clear large data structures
+        this.tempExtractedQuestions = null;
+        this.tempExtractedPracticeSets = null;
+        this.currentExtractedQuestions = null;
+        
+        // Force garbage collection hint
+        if (window.gc) {
+            window.gc();
+        }
+        
+        console.log('Memory cleanup completed');
     }
 
     // Enhanced success message builder for better UX
@@ -8810,131 +8477,6 @@ D) 6</pre>
         
         message += '\n\n✅ All content has been saved and is ready for use.';
         return message;
-    }
-
-    // Enhanced mathematical expression rendering using MathJax
-    renderMathematicalExpressions(text) {
-        if (!text) return text;
-        
-        // Convert common mathematical notations to MathJax format
-        let mathText = text;
-        
-        // Replace marked mathematical expressions
-        mathText = mathText.replace(/<MATH_(\d+)>(.*?)<\/MATH_\1>/g, (match, index, content) => {
-            return this.formatMathExpression(content);
-        });
-        
-        // Convert common math patterns to LaTeX
-        const mathPatterns = [
-            { pattern: /(\d+)\/(\d+)/g, replacement: '\\frac{$1}{$2}' },
-            { pattern: /(\w+)\^(\d+)/g, replacement: '$1^{$2}' },
-            { pattern: /sqrt\(([^)]+)\)/g, replacement: '\\sqrt{$1}' },
-            { pattern: /\b(sin|cos|tan|log|ln)\(([^)]+)\)/g, replacement: '\\$1($2)' }
-        ];
-        
-        mathPatterns.forEach(({ pattern, replacement }) => {
-            mathText = mathText.replace(pattern, replacement);
-        });
-        
-        return mathText;
-    }
-
-    // Format mathematical expressions for MathJax
-    formatMathExpression(expr) {
-        // Simple expressions can be inline
-        if (expr.length < 20 && !expr.includes('=')) {
-            return `$${expr}$`;
-        }
-        // Complex expressions should be displayed
-        return `$$${expr}$$`;
-    }
-
-    // Trigger MathJax rendering for dynamically added content
-    renderMathJax(element) {
-        if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
-            MathJax.typesetPromise([element]).catch((err) => {
-                console.warn('MathJax rendering error:', err);
-            });
-        }
-    }
-
-    // Enhanced image extraction from PDF (placeholder for future implementation)
-    extractImagesFromPDF(pdf) {
-        console.log('🖼️ Extracting images from PDF...');
-        
-        const imageReferences = [];
-        
-        // This is a placeholder for actual image extraction
-        // In a full implementation, you would:
-        // 1. Extract image data from PDF pages
-        // 2. Convert to base64 or save as files
-        // 3. Associate with question numbers
-        // 4. Store references for display
-        
-        // For now, we'll detect image placeholders in text
-        return imageReferences;
-    }
-
-    // Associate images with questions based on proximity and references
-    associateImagesWithQuestions(questions, imageReferences) {
-        console.log('🔗 Associating images with questions...');
-        
-        questions.forEach(question => {
-            // Check if question text references an image
-            const imageRefs = question.text.match(/<IMAGE_REF>(.*?)<\/IMAGE_REF>/g);
-            if (imageRefs) {
-                question.hasImages = true;
-                question.imageReferences = imageRefs.map(ref => 
-                    ref.replace(/<\/?IMAGE_REF>/g, '')
-                );
-            }
-        });
-        
-        return questions;
-    }
-
-    // Enhanced question rendering with math and image support
-    renderQuestionWithEnhancements(question, container) {
-        // Render mathematical expressions
-        const mathRenderedText = this.renderMathematicalExpressions(question.text);
-        const mathRenderedOptions = question.options.map(opt => 
-            this.renderMathematicalExpressions(opt)
-        );
-        
-        // Create question HTML with enhanced support
-        container.innerHTML = `
-            <div class="question-content-enhanced">
-                <div class="question-text">${mathRenderedText}</div>
-                ${question.hasImages ? this.renderImagePlaceholders(question.imageReferences) : ''}
-                <div class="question-options">
-                    ${mathRenderedOptions.map((option, index) => `
-                        <div class="option" data-value="${index}">
-                            <span class="option-label">${String.fromCharCode(65 + index)})</span>
-                            <span class="option-text">${option}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-        
-        // Trigger MathJax rendering
-        this.renderMathJax(container);
-    }
-
-    // Render image placeholders
-    renderImagePlaceholders(imageReferences) {
-        if (!imageReferences || imageReferences.length === 0) return '';
-        
-        return `
-            <div class="question-images">
-                ${imageReferences.map(ref => `
-                    <div class="image-placeholder">
-                        <span class="image-icon">🖼️</span>
-                        <span class="image-text">${ref}</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
     }
 
     // Enhanced error message builder with actionable guidance
