@@ -9,6 +9,8 @@ class MockTestApp {
         this.questions = JSON.parse(localStorage.getItem('mockTestQuestions')) || [];
         this.testResults = JSON.parse(localStorage.getItem('mockTestResults')) || [];
         this.uploadedPDFs = JSON.parse(localStorage.getItem('uploadedPDFs')) || [];
+        this.draftMockTests = JSON.parse(localStorage.getItem('draftMockTests')) || [];
+        this.availableMockTests = JSON.parse(localStorage.getItem('availableMockTests')) || [];
         this.currentTest = null;
         this.testSession = null;
         this.charts = {};
@@ -20,6 +22,7 @@ class MockTestApp {
         this.currentReviewIndex = 0;
         this.currentPDFFile = null;
         this.currentPDFMetadata = null;
+        this.currentDraftMockTest = null;
         
         // Initialize syllabus mapping for intelligent chapter detection
         this.initializeSyllabusMapping();
@@ -714,6 +717,17 @@ class MockTestApp {
             e.preventDefault();
             this.hideModal('pdfUploadModal');
             this.resetPDFUpload();
+        });
+
+        // Mock Test Preview Modal
+        this.setupElementListener('acceptMockTest', 'click', (e) => {
+            e.preventDefault();
+            this.acceptMockTest();
+        });
+
+        this.setupElementListener('cancelMockTest', 'click', (e) => {
+            e.preventDefault();
+            this.cancelMockTest();
         });
 
         // PDF Viewer
@@ -2309,7 +2323,8 @@ class MockTestApp {
             if (validQuestions.length > 0) {
                 this.updateProcessingStep(`Successfully extracted ${validQuestions.length} questions!`);
                 setTimeout(() => {
-                    this.showExtractedQuestionsPreview(validQuestions);
+                    // NEW: Create draft mock test instead of showing questions preview
+                    this.createDraftMockTest(validQuestions);
                     
                     // Show chapter suggestions if AI detection was used
                     if (isAutoDetectEnabled && this.lastDetectionResult && this.currentPDFMetadata.subject !== 'Mixed/Practice Books') {
@@ -3226,6 +3241,287 @@ D) 6</pre>
             source: q.source,
             extractionSource: q.extractionSource
         })));
+    }
+
+    // NEW: Create draft mock test from extracted questions
+    createDraftMockTest(questions) {
+        console.log('Creating draft mock test from', questions.length, 'questions');
+        
+        // Calculate time limit based on question count (standard RRB timing: 54 seconds per question)
+        const timeLimit = Math.max(Math.ceil(questions.length * 0.9), 10); // minimum 10 minutes
+        
+        // Create mock test metadata
+        const testTitle = this.generateMockTestTitle(questions);
+        const subject = this.currentPDFMetadata?.subject || 'Mixed';
+        
+        // Create the draft mock test object
+        const draftMockTest = {
+            id: 'draft_' + Date.now(),
+            title: testTitle,
+            subject: subject,
+            chapter: this.currentPDFMetadata?.chapter || 'PDF Extract',
+            totalQuestions: questions.length,
+            timeLimit: timeLimit, // in minutes
+            questions: questions,
+            difficulty: this.calculateOverallDifficulty(questions),
+            source: 'PDF Upload',
+            fileName: this.currentPDFFile?.name || 'uploaded.pdf',
+            createdAt: new Date().toISOString(),
+            userId: this.currentUser?.id || 'anonymous',
+            status: 'draft'
+        };
+        
+        // Store the draft
+        this.currentDraftMockTest = draftMockTest;
+        
+        // Hide processing modal and show preview
+        this.hideModal('pdfUploadModal');
+        this.showMockTestPreview(draftMockTest);
+    }
+
+    // Generate an appropriate title for the mock test
+    generateMockTestTitle(questions) {
+        const subject = this.currentPDFMetadata?.subject || 'Mixed';
+        const chapter = this.currentPDFMetadata?.chapter || 'General';
+        const fileName = this.currentPDFFile?.name || 'upload';
+        
+        // Extract base name from file (remove extension)
+        const baseName = fileName.replace(/\.[^/.]+$/, "");
+        
+        // Generate different titles based on content
+        if (subject === 'Mixed/Practice Books') {
+            return `${baseName} - Complete Practice Test`;
+        } else if (chapter === 'Auto-detect' || chapter === 'PDF Extract') {
+            return `${subject} - ${baseName}`;
+        } else {
+            return `${subject}: ${chapter} - Practice Test`;
+        }
+    }
+
+    // Calculate overall difficulty based on questions
+    calculateOverallDifficulty(questions) {
+        if (!questions || questions.length === 0) return 'Medium';
+        
+        const difficultyCounts = {
+            'Easy': 0,
+            'Medium': 0,
+            'Hard': 0
+        };
+        
+        questions.forEach(q => {
+            const diff = q.difficulty || 'Medium';
+            difficultyCounts[diff] = (difficultyCounts[diff] || 0) + 1;
+        });
+        
+        // Return the most common difficulty, with ties going to Medium
+        const maxCount = Math.max(...Object.values(difficultyCounts));
+        if (difficultyCounts['Medium'] === maxCount) return 'Medium';
+        if (difficultyCounts['Easy'] === maxCount) return 'Easy';
+        if (difficultyCounts['Hard'] === maxCount) return 'Hard';
+        return 'Medium';
+    }
+
+    // Show mock test preview modal
+    showMockTestPreview(draftMockTest) {
+        console.log('Showing mock test preview for:', draftMockTest.title);
+        
+        const sampleQuestions = draftMockTest.questions.slice(0, 5); // Show first 5 questions
+        const subjectDistribution = this.calculateSubjectDistribution(draftMockTest.questions);
+        
+        const previewHtml = `
+            <div class="mock-test-preview">
+                <div class="test-header-preview">
+                    <h3>🎯 ${draftMockTest.title}</h3>
+                    <p class="test-description">Your PDF has been converted to a complete mock test!</p>
+                </div>
+                
+                <div class="test-info-grid">
+                    <div class="info-card">
+                        <h4>📚 Subject</h4>
+                        <p class="info-value">${draftMockTest.subject}</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>📋 Total Questions</h4>
+                        <p class="info-value">${draftMockTest.totalQuestions}</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>⏱️ Time Limit</h4>
+                        <p class="info-value">${draftMockTest.timeLimit} minutes</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>📊 Difficulty</h4>
+                        <p class="info-value difficulty-${draftMockTest.difficulty.toLowerCase()}">${draftMockTest.difficulty}</p>
+                    </div>
+                </div>
+                
+                ${Object.keys(subjectDistribution).length > 1 ? `
+                    <div class="subject-distribution">
+                        <h4>📈 Subject Distribution</h4>
+                        <div class="distribution-grid">
+                            ${Object.entries(subjectDistribution).map(([subject, count]) => `
+                                <div class="distribution-item">
+                                    <span class="subject-name">${subject}</span>
+                                    <span class="question-count">${count} questions</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <div class="sample-questions-section">
+                    <h4>📝 Sample Questions Preview</h4>
+                    <div class="sample-questions">
+                        ${sampleQuestions.map((question, index) => `
+                            <div class="sample-question">
+                                <div class="question-header">
+                                    <span class="question-number">Q${index + 1}</span>
+                                    <span class="question-difficulty difficulty-badge difficulty-${(question.difficulty || 'medium').toLowerCase()}">${question.difficulty || 'Medium'}</span>
+                                </div>
+                                <div class="question-text">${question.text}</div>
+                                <div class="question-options">
+                                    ${question.options.map((option, optIndex) => `
+                                        <div class="option-preview">
+                                            <span class="option-label">${String.fromCharCode(65 + optIndex)})</span>
+                                            <span class="option-text">${option}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${draftMockTest.totalQuestions > 5 ? `
+                            <div class="more-questions-indicator">
+                                <p>... and ${draftMockTest.totalQuestions - 5} more questions</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <div class="test-features">
+                    <h4>✨ Test Features</h4>
+                    <div class="features-grid">
+                        <div class="feature-item">
+                            <span class="feature-icon">⏱️</span>
+                            <span class="feature-text">Timed test simulation</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">📊</span>
+                            <span class="feature-text">Detailed performance analytics</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">📝</span>
+                            <span class="feature-text">Question review with explanations</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🎯</span>
+                            <span class="feature-text">Score tracking & progress monitoring</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="preview-actions-description">
+                    <div class="action-description">
+                        <h4>What happens next?</h4>
+                        <p><strong>Accept:</strong> Add this mock test to your dashboard for immediate use</p>
+                        <p><strong>Cancel:</strong> Discard this test and return to question bank</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const container = document.getElementById('mockTestPreviewContainer');
+        if (container) {
+            container.innerHTML = previewHtml;
+        }
+        
+        this.showModal('mockTestPreviewModal');
+    }
+
+    // Calculate subject distribution for display
+    calculateSubjectDistribution(questions) {
+        const distribution = {};
+        questions.forEach(q => {
+            const subject = q.subject || 'General';
+            distribution[subject] = (distribution[subject] || 0) + 1;
+        });
+        return distribution;
+    }
+
+    // Handle Accept button click
+    acceptMockTest() {
+        if (!this.currentDraftMockTest) {
+            console.error('No draft mock test to accept');
+            return;
+        }
+        
+        console.log('Accepting mock test:', this.currentDraftMockTest.title);
+        
+        // Remove draft status and add to available tests
+        const mockTest = {
+            ...this.currentDraftMockTest,
+            status: 'available',
+            acceptedAt: new Date().toISOString()
+        };
+        
+        // Add to available mock tests
+        this.availableMockTests.push(mockTest);
+        this.saveAvailableMockTests();
+        
+        // Also add questions to question bank for backward compatibility
+        const questionsToAdd = mockTest.questions.map(q => ({
+            ...q,
+            source: `Mock Test: ${mockTest.title}`,
+            mockTestId: mockTest.id
+        }));
+        
+        this.questions.push(...questionsToAdd);
+        this.saveQuestions();
+        
+        // Clear draft
+        this.currentDraftMockTest = null;
+        
+        // Hide modal and show success
+        this.hideModal('mockTestPreviewModal');
+        
+        // Show success message and navigate to dashboard
+        alert(`✅ Mock test "${mockTest.title}" has been added to your dashboard!\n\nYou can now take this test from the Dashboard or Test Selection page.`);
+        
+        // Update dashboard stats
+        this.updateDashboardStats();
+        
+        // Navigate to dashboard to show the new test
+        this.switchSection('dashboard');
+    }
+
+    // Handle Cancel button click
+    cancelMockTest() {
+        if (!this.currentDraftMockTest) {
+            console.error('No draft mock test to cancel');
+            return;
+        }
+        
+        console.log('Cancelling mock test:', this.currentDraftMockTest.title);
+        
+        // Clear draft
+        this.currentDraftMockTest = null;
+        
+        // Hide modal
+        this.hideModal('mockTestPreviewModal');
+        
+        // Show confirmation and navigate back
+        alert('❌ Mock test has been discarded. No questions were added.');
+        
+        // Navigate back to question bank
+        this.switchSection('questionBank');
+    }
+
+    // Save available mock tests to localStorage
+    saveAvailableMockTests() {
+        try {
+            localStorage.setItem('availableMockTests', JSON.stringify(this.availableMockTests));
+            console.log('Available mock tests saved successfully');
+        } catch (error) {
+            console.error('Error saving available mock tests:', error);
+        }
     }
 
     // NEW: Show practice sets preview
@@ -4360,14 +4656,20 @@ D) 6</pre>
         
         const userResults = this.testResults.filter(result => result.userId === this.currentUser.id);
         
-        // Get stored mock tests
+        // Get stored mock tests (existing practice sets)
         const storedMockTests = JSON.parse(localStorage.getItem('mockTests')) || [];
+        
+        // Get PDF-generated available mock tests
+        const userAvailableMockTests = this.availableMockTests.filter(test => 
+            test.userId === this.currentUser.id || !test.userId
+        );
         
         const stats = {
             totalTests: userResults.length,
             totalQuestions: this.questions.length,
-            availableMockTests: storedMockTests.length,
+            availableMockTests: storedMockTests.length + userAvailableMockTests.length,
             practiceSetTests: storedMockTests.filter(test => test.type === 'practice_set').length,
+            pdfMockTests: userAvailableMockTests.length,
             averageScore: userResults.length > 0 ? 
                 Math.round(userResults.reduce((sum, result) => sum + result.score, 0) / userResults.length) : 0,
             bestScore: userResults.length > 0 ? 
@@ -4390,11 +4692,171 @@ D) 6</pre>
 
         // Update practice sets section in dashboard
         this.updatePracticeSetsDashboard(storedMockTests);
+        
+        // NEW: Update PDF mock tests section in dashboard
+        this.updatePDFMockTestsDashboard(userAvailableMockTests);
 
         // Update user's average score
         this.currentUser.averageScore = stats.averageScore;
         this.currentUser.totalTests = stats.totalTests;
         this.saveUsers();
+    }
+
+    // NEW: Update PDF-generated mock tests dashboard section
+    updatePDFMockTestsDashboard(availableMockTests) {
+        // Find or create PDF mock tests container in dashboard
+        let mockTestContainer = document.getElementById('pdfMockTestsDashboard');
+        
+        if (!mockTestContainer) {
+            // Create the container if it doesn't exist
+            const quickActions = document.querySelector('#dashboard .quick-actions');
+            if (quickActions) {
+                mockTestContainer = document.createElement('div');
+                mockTestContainer.id = 'pdfMockTestsDashboard';
+                mockTestContainer.className = 'dashboard-section';
+                quickActions.parentNode.insertBefore(mockTestContainer, quickActions.nextSibling);
+            }
+        }
+        
+        if (mockTestContainer) {
+            if (availableMockTests.length > 0) {
+                mockTestContainer.innerHTML = `
+                    <div class="section-header">
+                        <h3>🎯 PDF Mock Tests</h3>
+                        <p>Mock tests created from your uploaded PDFs</p>
+                    </div>
+                    <div class="pdf-mock-tests-grid">
+                        ${availableMockTests.slice(0, 6).map(test => `
+                            <div class="pdf-mock-test-card">
+                                <div class="test-header">
+                                    <h4>${test.title}</h4>
+                                    <div class="test-badges">
+                                        <span class="difficulty-badge difficulty-${test.difficulty.toLowerCase()}">${test.difficulty}</span>
+                                        <span class="subject-badge">${test.subject}</span>
+                                    </div>
+                                </div>
+                                <div class="test-details">
+                                    <div class="detail-item">
+                                        <span class="detail-label">📋 Questions:</span>
+                                        <span class="detail-value">${test.totalQuestions}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">⏱️ Time:</span>
+                                        <span class="detail-value">${test.timeLimit} min</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">📄 Source:</span>
+                                        <span class="detail-value">${test.fileName}</span>
+                                    </div>
+                                </div>
+                                <div class="test-actions">
+                                    <button class="btn btn--primary btn--small" 
+                                            onclick="app.startPDFMockTest('${test.id}')">
+                                        🚀 Start Test
+                                    </button>
+                                    <button class="btn btn--outline btn--small" 
+                                            onclick="app.previewPDFMockTest('${test.id}')">
+                                        👁️ Preview
+                                    </button>
+                                </div>
+                                <div class="test-meta">
+                                    <small>Created: ${new Date(test.createdAt).toLocaleDateString()}</small>
+                                    ${test.acceptedAt ? `<small>Added: ${new Date(test.acceptedAt).toLocaleDateString()}</small>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${availableMockTests.length > 6 ? `
+                        <div class="view-all-tests">
+                            <button class="btn btn--secondary" onclick="app.showAllPDFMockTests()">
+                                View All ${availableMockTests.length} PDF Mock Tests
+                            </button>
+                        </div>
+                    ` : ''}
+                `;
+            } else {
+                mockTestContainer.innerHTML = `
+                    <div class="section-header">
+                        <h3>🎯 PDF Mock Tests</h3>
+                        <p>No PDF mock tests available yet</p>
+                    </div>
+                    <div class="empty-state">
+                        <p>Upload a PDF with questions to create mock tests automatically!</p>
+                        <button class="btn btn--primary" onclick="app.switchSection('questionBank')">
+                            📄 Upload PDF Questions
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // NEW: Start a PDF-generated mock test
+    startPDFMockTest(testId) {
+        const mockTest = this.availableMockTests.find(test => test.id === testId);
+        if (!mockTest) {
+            alert('Mock test not found');
+            return;
+        }
+        
+        console.log('Starting PDF mock test:', mockTest.title);
+        
+        // Create test configuration from mock test
+        const testConfig = {
+            type: 'pdf_mock_test',
+            title: mockTest.title,
+            questions: mockTest.questions,
+            timeLimit: mockTest.timeLimit * 60, // Convert minutes to seconds
+            mockTestId: mockTest.id
+        };
+        
+        // Start the test
+        this.startTestSession(testConfig);
+        this.switchSection('testInterface');
+        
+        setTimeout(() => {
+            this.initializeTestInterface();
+        }, 200);
+    }
+
+    // NEW: Preview a PDF-generated mock test
+    previewPDFMockTest(testId) {
+        const mockTest = this.availableMockTests.find(test => test.id === testId);
+        if (!mockTest) {
+            alert('Mock test not found');
+            return;
+        }
+        
+        // Reuse the existing preview functionality
+        this.currentDraftMockTest = { ...mockTest, status: 'preview' };
+        this.showMockTestPreview(this.currentDraftMockTest);
+        
+        // Change button text for preview mode
+        setTimeout(() => {
+            const acceptBtn = document.getElementById('acceptMockTest');
+            const cancelBtn = document.getElementById('cancelMockTest');
+            if (acceptBtn && cancelBtn) {
+                acceptBtn.textContent = '🚀 Start Test';
+                acceptBtn.onclick = () => {
+                    this.hideModal('mockTestPreviewModal');
+                    this.startPDFMockTest(testId);
+                };
+                cancelBtn.textContent = '❌ Close';
+                cancelBtn.onclick = () => {
+                    this.hideModal('mockTestPreviewModal');
+                };
+            }
+        }, 100);
+    }
+
+    // NEW: Show all PDF mock tests
+    showAllPDFMockTests() {
+        alert('Feature coming soon: View all PDF mock tests in a dedicated page');
+    }
+
+    // Update dashboard statistics
+    updateDashboardStats() {
+        this.updateDashboard();
     }
 
     // NEW: Update practice sets dashboard section
