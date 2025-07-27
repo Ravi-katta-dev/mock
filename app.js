@@ -6304,8 +6304,10 @@ D) 6</pre>
         
         // Initialize test interface and start the session
         setTimeout(() => {
-            this.initializeTestInterface();
+            // Start the session first
             this.testEngine.startSession();
+            // Then initialize the interface
+            this.initializeTestInterface();
         }, 200);
         
         return session;
@@ -7247,7 +7249,16 @@ D) 6</pre>
      */
     renderQuestionWithEngine() {
         const currentQuestion = this.testEngine.getCurrentQuestion();
-        if (!currentQuestion) return;
+        if (!currentQuestion) {
+            console.error('No current question available from TestEngine');
+            console.log('TestEngine session status:', this.testEngine.getSessionStatus());
+            // Fall back to legacy rendering if TestEngine fails
+            if (this.testSession) {
+                console.log('Falling back to legacy rendering');
+                return this.renderQuestion();
+            }
+            return;
+        }
         
         const { question, number, totalQuestions, selectedAnswer } = currentQuestion;
         
