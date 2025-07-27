@@ -38,6 +38,9 @@ class MockTestApp {
         // Initialize configuration from modular files
         this.initializeConfiguration();
         
+        // Initialize Results and Analytics Module
+        this.initializeResultsAnalyzer();
+        
         // Initialize enhanced UI features
         this.initializeEnhancedUI();
         
@@ -79,6 +82,18 @@ class MockTestApp {
         } else {
             console.warn('Some configuration modules failed to load, using fallback configuration');
             this.initializeFallbackConfiguration();
+        }
+    }
+
+    initializeResultsAnalyzer() {
+        // Initialize the Results and Analytics Module
+        if (typeof window.ResultsAnalyzer !== 'undefined') {
+            this.resultsAnalyzer = new window.ResultsAnalyzer(this);
+            console.log('ResultsAnalyzer module loaded successfully');
+        } else {
+            console.error('ResultsAnalyzer module not loaded');
+            // Fallback to basic analytics
+            this.resultsAnalyzer = null;
         }
     }
 
@@ -7198,45 +7213,76 @@ D) 6</pre>
             return;
         }
         
-        // Calculate results
-        let correctAnswers = 0;
-        let incorrectAnswers = 0;
-        let unattempted = 0;
-        
-        this.testSession.questions.forEach((question, index) => {
-            const userAnswer = this.testSession.answers[index];
-            if (userAnswer === -1) {
-                unattempted++;
-            } else if (userAnswer === question.correctAnswer) {
-                correctAnswers++;
-            } else {
-                incorrectAnswers++;
-            }
-        });
-        
-        // Calculate score (with negative marking)
-        const rawScore = correctAnswers - (incorrectAnswers * 0.33);
-        const percentage = Math.round((rawScore / this.testSession.questions.length) * 100);
-        
-        // Save result
-        const result = {
-            id: this.testSession.id,
-            userId: this.currentUser.id,
-            testType: this.testSession.config.title,
-            totalQuestions: this.testSession.questions.length,
-            correctAnswers: correctAnswers,
-            incorrectAnswers: incorrectAnswers,
-            unattempted: unattempted,
-            score: Math.max(0, percentage),
-            rawScore: Math.max(0, rawScore),
-            timeSpent: Date.now() - this.testSession.startTime,
-            completedAt: new Date().toISOString(),
-            questions: this.testSession.questions,
-            answers: this.testSession.answers,
-            marked: this.testSession.marked,
-            questionTimeSpent: this.testSession.timeSpent
+        // Prepare time data for analysis
+        const timeData = {
+            totalTime: Date.now() - this.testSession.startTime,
+            timeRemaining: this.testSession.timeRemaining * 1000, // Convert to milliseconds
+            questionTimeSpent: this.testSession.timeSpent || {}
         };
+
+        // Use ResultsAnalyzer if available, otherwise fall back to basic calculation
+        let result;
+        if (this.resultsAnalyzer) {
+            console.log('🧮 Using advanced ResultsAnalyzer for comprehensive results...');
+            result = this.resultsAnalyzer.calculateComprehensiveResults(
+                this.testSession,
+                this.testSession.questions,
+                this.testSession.answers,
+                timeData
+            );
+            
+            // Generate insights and recommendations
+            const insights = this.resultsAnalyzer.generateInsightsAndRecommendations(result);
+            result.insights = insights;
+            
+            // Generate comparison with previous attempts
+            const previousResults = this.testResults.filter(r => r.userId === this.currentUser.id);
+            const comparison = this.resultsAnalyzer.generateComparisonAnalysis(result, previousResults);
+            result.comparison = comparison;
+            
+        } else {
+            console.log('⚠️ Using fallback basic calculation...');
+            // Fallback to original calculation
+            let correctAnswers = 0;
+            let incorrectAnswers = 0;
+            let unattempted = 0;
+            
+            this.testSession.questions.forEach((question, index) => {
+                const userAnswer = this.testSession.answers[index];
+                if (userAnswer === -1) {
+                    unattempted++;
+                } else if (userAnswer === question.correctAnswer) {
+                    correctAnswers++;
+                } else {
+                    incorrectAnswers++;
+                }
+            });
+            
+            // Calculate score (with negative marking)
+            const rawScore = correctAnswers - (incorrectAnswers * 0.33);
+            const percentage = Math.round((rawScore / this.testSession.questions.length) * 100);
+            
+            // Basic result object
+            result = {
+                id: this.testSession.id,
+                userId: this.currentUser.id,
+                testType: this.testSession.config.title,
+                totalQuestions: this.testSession.questions.length,
+                correctAnswers: correctAnswers,
+                incorrectAnswers: incorrectAnswers,
+                unattempted: unattempted,
+                score: Math.max(0, percentage),
+                rawScore: Math.max(0, rawScore),
+                timeSpent: timeData.totalTime,
+                completedAt: new Date().toISOString(),
+                questions: this.testSession.questions,
+                answers: this.testSession.answers,
+                marked: this.testSession.marked,
+                questionTimeSpent: this.testSession.timeSpent
+            };
+        }
         
+        // Save the result
         this.testResults.push(result);
         this.saveTestResults();
         
@@ -7261,8 +7307,10 @@ D) 6</pre>
         const result = this.currentTest;
         if (!result) return;
         
+        console.log('🔍 Rendering test review with advanced analytics...');
+        
         // Enhanced summary with detailed performance analysis
-        const summaryHtml = `
+        let summaryHtml = `
             <div class="review-header">
                 <h2>📋 Test Review & Solutions</h2>
                 <p class="test-info">
@@ -7293,49 +7341,55 @@ D) 6</pre>
                 </div>
                 <div class="summary-item score">
                     <h4>🎯 Final Score</h4>
-                    <div class="summary-value">${result.score}%</div>
+                    <div class="summary-value">${result.score.toFixed(1)}%</div>
                     <div class="summary-grade">${this.getGrade(result.score)}</div>
                 </div>
                 <div class="summary-item time">
                     <h4>⏱️ Time Taken</h4>
-                    <div class="summary-value">${Math.round(result.timeSpent / 60000)} min</div>
-                    <div class="summary-average">Avg: ${Math.round(result.timeSpent / (result.totalQuestions * 1000))}s/Q</div>
+                    <div class="summary-value">${Math.round((result.timeSpent || result.timeAnalysis?.totalTimeSpent || 0) / 60000)} min</div>
+                    <div class="summary-average">Avg: ${Math.round((result.timeSpent || result.timeAnalysis?.totalTimeSpent || 0) / (result.totalQuestions * 1000))}s/Q</div>
                 </div>
-            </div>
-            
-            <div class="performance-analysis">
-                <div class="performance-message">
-                    <h3>${this.getPerformanceMessage(result.score)}</h3>
-                    <p>${this.getPerformanceAdvice(result)}</p>
-                </div>
-                
-                <div class="detailed-analysis">
-                    <h4>📈 Detailed Analysis</h4>
-                    <div class="analysis-grid">
-                        <div class="analysis-item">
-                            <span class="label">Accuracy Rate:</span>
-                            <span class="value">${result.correctAnswers + result.incorrectAnswers > 0 ? Math.round((result.correctAnswers/(result.correctAnswers + result.incorrectAnswers))*100) : 0}%</span>
-                        </div>
-                        <div class="analysis-item">
-                            <span class="label">Attempt Rate:</span>
-                            <span class="value">${Math.round(((result.correctAnswers + result.incorrectAnswers)/result.totalQuestions)*100)}%</span>
-                        </div>
-                        <div class="analysis-item">
-                            <span class="label">Raw Score:</span>
-                            <span class="value">${result.rawScore.toFixed(2)}/${result.totalQuestions}</span>
-                        </div>
-                        <div class="analysis-item">
-                            <span class="label">Negative Marking:</span>
-                            <span class="value">-${(result.incorrectAnswers * 0.33).toFixed(2)} marks</span>
+            </div>`;
+        
+        // Add advanced analytics if available
+        if (result.sectionalAnalysis && result.performanceMetrics && result.insights) {
+            summaryHtml += this.renderAdvancedAnalytics(result);
+        } else {
+            // Fallback to basic analysis
+            summaryHtml += `
+                <div class="performance-analysis">
+                    <div class="performance-message">
+                        <h3>${this.getPerformanceMessage(result.score)}</h3>
+                        <p>${this.getPerformanceAdvice(result)}</p>
+                    </div>
+                    
+                    <div class="detailed-analysis">
+                        <h4>📈 Detailed Analysis</h4>
+                        <div class="analysis-grid">
+                            <div class="analysis-item">
+                                <span class="label">Accuracy Rate:</span>
+                                <span class="value">${result.correctAnswers + result.incorrectAnswers > 0 ? Math.round((result.correctAnswers/(result.correctAnswers + result.incorrectAnswers))*100) : 0}%</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="label">Attempt Rate:</span>
+                                <span class="value">${Math.round(((result.correctAnswers + result.incorrectAnswers)/result.totalQuestions)*100)}%</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="label">Raw Score:</span>
+                                <span class="value">${result.rawScore?.toFixed(2) || 0}/${result.totalQuestions}</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="label">Negative Marking:</span>
+                                <span class="value">-${(result.incorrectAnswers * 0.33).toFixed(2)} marks</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="subject-wise-analysis">
-                ${this.generateSubjectWiseAnalysis(result)}
-            </div>
-        `;
+                
+                <div class="subject-wise-analysis">
+                    ${this.generateSubjectWiseAnalysis(result)}
+                </div>`;
+        }
         
         const summaryEl = document.getElementById('reviewSummary');
         if (summaryEl) {
@@ -7344,6 +7398,264 @@ D) 6</pre>
         
         // Render all questions with solutions by default
         this.renderReviewQuestions('all');
+        
+        // Add export functionality buttons if advanced analytics are available
+        if (result.insights && this.resultsAnalyzer) {
+            this.addExportButtons(result);
+        }
+    }
+
+    /**
+     * Render advanced analytics section
+     * @param {Object} result - Test result with advanced analytics
+     * @returns {string} HTML for advanced analytics
+     */
+    renderAdvancedAnalytics(result) {
+        let html = `
+            <div class="advanced-analytics">
+                <div class="performance-overview">
+                    <h3>🎯 Performance Overview</h3>
+                    <div class="performance-grid">
+                        <div class="performance-metric">
+                            <span class="metric-label">Overall Performance</span>
+                            <span class="metric-value">${result.performanceCategory}</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill" style="width: ${result.score}%"></div>
+                            </div>
+                        </div>
+                        <div class="performance-metric">
+                            <span class="metric-label">Accuracy Rate</span>
+                            <span class="metric-value">${result.accuracyRate.toFixed(1)}%</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill" style="width: ${result.accuracyRate}%"></div>
+                            </div>
+                        </div>
+                        <div class="performance-metric">
+                            <span class="metric-label">Attempt Rate</span>
+                            <span class="metric-value">${result.attemptRate.toFixed(1)}%</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill" style="width: ${result.attemptRate}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+
+        // Subject-wise detailed analysis
+        if (result.sectionalAnalysis) {
+            html += `
+                <div class="sectional-analysis">
+                    <h3>📚 Subject-wise Performance</h3>
+                    <div class="subjects-grid">`;
+            
+            Object.values(result.sectionalAnalysis.sections).forEach(section => {
+                html += `
+                    <div class="subject-card">
+                        <h4>${section.subject}</h4>
+                        <div class="subject-score">${section.percentageScore.toFixed(1)}%</div>
+                        <div class="subject-stats">
+                            <span class="stat">✅ ${section.correctAnswers}/${section.totalQuestions}</span>
+                            <span class="stat">📊 ${section.accuracyRate.toFixed(1)}% accuracy</span>
+                        </div>
+                        <div class="subject-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${section.percentageScore}%"></div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            
+            html += `
+                    </div>
+                </div>`;
+        }
+
+        // Time analysis
+        if (result.timeAnalysis) {
+            html += `
+                <div class="time-analysis">
+                    <h3>⏱️ Time Analysis</h3>
+                    <div class="time-metrics">
+                        <div class="time-stat">
+                            <span class="time-label">Average per Question</span>
+                            <span class="time-value">${Math.round(result.timeAnalysis.averageTimePerQuestion / 1000)}s</span>
+                        </div>
+                        <div class="time-stat">
+                            <span class="time-label">Time Efficiency</span>
+                            <span class="time-value">${result.timeAnalysis.timeEfficiency?.toFixed(1) || 0}%</span>
+                        </div>
+                    </div>
+                    <div class="timing-distribution">
+                        <h4>Timing Pattern</h4>
+                        <div class="timing-bars">
+                            <div class="timing-bar">
+                                <span class="timing-label">⚡ Fast (&lt;30s)</span>
+                                <div class="timing-progress">
+                                    <div class="timing-fill fast" style="width: ${(result.timeAnalysis.timingDistribution.fast / result.totalQuestions) * 100}%"></div>
+                                </div>
+                                <span class="timing-count">${result.timeAnalysis.timingDistribution.fast}</span>
+                            </div>
+                            <div class="timing-bar">
+                                <span class="timing-label">✅ Optimal (30-54s)</span>
+                                <div class="timing-progress">
+                                    <div class="timing-fill optimal" style="width: ${(result.timeAnalysis.timingDistribution.optimal / result.totalQuestions) * 100}%"></div>
+                                </div>
+                                <span class="timing-count">${result.timeAnalysis.timingDistribution.optimal}</span>
+                            </div>
+                            <div class="timing-bar">
+                                <span class="timing-label">🐌 Slow (&gt;54s)</span>
+                                <div class="timing-progress">
+                                    <div class="timing-fill slow" style="width: ${((result.timeAnalysis.timingDistribution.slow + result.timeAnalysis.timingDistribution.tooSlow) / result.totalQuestions) * 100}%"></div>
+                                </div>
+                                <span class="timing-count">${result.timeAnalysis.timingDistribution.slow + result.timeAnalysis.timingDistribution.tooSlow}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // Insights and recommendations
+        if (result.insights) {
+            html += `
+                <div class="insights-section">
+                    <h3>💡 Insights & Recommendations</h3>`;
+            
+            if (result.insights.strengths && result.insights.strengths.length > 0) {
+                html += `
+                    <div class="strengths">
+                        <h4>💪 Your Strengths</h4>
+                        <ul class="insights-list">`;
+                result.insights.strengths.slice(0, 3).forEach(strength => {
+                    html += `<li class="strength-item">${strength.description}</li>`;
+                });
+                html += `
+                        </ul>
+                    </div>`;
+            }
+            
+            if (result.insights.weaknesses && result.insights.weaknesses.length > 0) {
+                html += `
+                    <div class="weaknesses">
+                        <h4>🎯 Areas for Improvement</h4>
+                        <ul class="insights-list">`;
+                result.insights.weaknesses.slice(0, 3).forEach(weakness => {
+                    html += `<li class="weakness-item">${weakness.description}</li>`;
+                });
+                html += `
+                        </ul>
+                    </div>`;
+            }
+            
+            if (result.insights.recommendations && result.insights.recommendations.length > 0) {
+                html += `
+                    <div class="recommendations">
+                        <h4>📋 Study Recommendations</h4>
+                        <ul class="insights-list">`;
+                result.insights.recommendations.slice(0, 4).forEach(recommendation => {
+                    html += `<li class="recommendation-item">${recommendation}</li>`;
+                });
+                html += `
+                        </ul>
+                    </div>`;
+            }
+            
+            html += `
+                </div>`;
+        }
+
+        // Comparison with previous attempts
+        if (result.comparison && result.comparison.hasComparison) {
+            html += `
+                <div class="comparison-section">
+                    <h3>📊 Progress Comparison</h3>
+                    <div class="comparison-stats">
+                        <div class="comparison-item">
+                            <span class="comparison-label">Current Score</span>
+                            <span class="comparison-value">${result.comparison.scoreComparison.current.toFixed(1)}%</span>
+                        </div>
+                        <div class="comparison-item">
+                            <span class="comparison-label">Previous Score</span>
+                            <span class="comparison-value">${result.comparison.scoreComparison.last.toFixed(1)}%</span>
+                        </div>
+                        <div class="comparison-item ${result.comparison.scoreComparison.improvement >= 0 ? 'improvement' : 'decline'}">
+                            <span class="comparison-label">Change</span>
+                            <span class="comparison-value">${result.comparison.scoreComparison.improvement > 0 ? '+' : ''}${result.comparison.scoreComparison.improvement.toFixed(1)}%</span>
+                        </div>
+                        <div class="comparison-item">
+                            <span class="comparison-label">Total Attempts</span>
+                            <span class="comparison-value">${result.comparison.attemptCount}</span>
+                        </div>
+                    </div>
+                    ${result.comparison.scoreComparison.isNewBest ? '<div class="new-best">🎉 New Personal Best!</div>' : ''}
+                </div>`;
+        }
+
+        html += `
+            </div>`;
+        
+        return html;
+    }
+
+    /**
+     * Add export functionality buttons
+     * @param {Object} result - Test result
+     */
+    addExportButtons(result) {
+        const summaryEl = document.getElementById('reviewSummary');
+        if (!summaryEl || !this.resultsAnalyzer) return;
+        
+        const exportSection = document.createElement('div');
+        exportSection.className = 'export-section';
+        exportSection.innerHTML = `
+            <h3>📤 Export Results</h3>
+            <div class="export-buttons">
+                <button class="btn btn--secondary" onclick="app.exportResults('pdf')">
+                    📄 Export as PDF Report
+                </button>
+                <button class="btn btn--secondary" onclick="app.exportResults('csv')">
+                    📊 Export as CSV Data
+                </button>
+                <button class="btn btn--secondary" onclick="app.exportResults('json')">
+                    💾 Export as JSON
+                </button>
+            </div>
+            <p class="export-note">
+                <small>Export your detailed results for further analysis or record keeping.</small>
+            </p>
+        `;
+        
+        summaryEl.appendChild(exportSection);
+    }
+
+    /**
+     * Export results using ResultsAnalyzer
+     * @param {string} format - Export format
+     */
+    async exportResults(format) {
+        if (!this.resultsAnalyzer || !this.currentTest) {
+            alert('Export functionality is not available at this time.');
+            return;
+        }
+        
+        try {
+            const result = await this.resultsAnalyzer.exportResults(this.currentTest, format);
+            console.log(`✅ Export successful:`, result);
+            
+            // Show success message
+            this.showAutoSaveIndicator('saved');
+            setTimeout(() => {
+                const indicator = document.getElementById('autoSaveIndicator');
+                const text = document.getElementById('autoSaveText');
+                if (indicator && text) {
+                    text.textContent = `${format.toUpperCase()} exported successfully!`;
+                    indicator.classList.add('visible');
+                    setTimeout(() => indicator.classList.remove('visible'), 3000);
+                }
+            }, 100);
+            
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert(`Export failed: ${error.message}`);
+        }
     }
 
     // Get grade based on score
@@ -7740,11 +8052,39 @@ D) 6</pre>
 
     // Analytics Methods
     loadAnalytics() {
-        if (this.testResults.filter(r => r.userId === this.currentUser?.id).length === 0) {
+        const userResults = this.testResults.filter(r => r.userId === this.currentUser?.id);
+        
+        if (userResults.length === 0) {
             this.showNoAnalyticsMessage();
             return;
         }
-        this.renderOverviewCharts();
+        
+        console.log('📊 Loading enhanced analytics...');
+        
+        // Use ResultsAnalyzer for enhanced analytics if available
+        if (this.resultsAnalyzer) {
+            this.renderEnhancedAnalytics(userResults);
+        } else {
+            // Fallback to basic analytics
+            this.renderOverviewCharts();
+        }
+    }
+
+    /**
+     * Render enhanced analytics using ResultsAnalyzer
+     * @param {Array} userResults - User's test results
+     */
+    renderEnhancedAnalytics(userResults) {
+        // Generate comprehensive analytics
+        const analyticsData = this.resultsAnalyzer.generateComprehensiveAnalytics(userResults);
+        
+        // Update overview tab with enhanced charts
+        this.renderEnhancedOverviewCharts(analyticsData);
+        
+        // Store analytics data for other tabs
+        this.currentAnalyticsData = analyticsData;
+        
+        console.log('✅ Enhanced analytics loaded successfully');
     }
 
     showNoAnalyticsMessage() {

@@ -4972,3 +4972,381 @@ body:not(.using-keyboard) *:focus {
         transform: translateX(20px);
     }
 }
+
+/* ============================================================================
+   ADVANCED ANALYTICS STYLES
+   ============================================================================ */
+
+.advanced-analytics {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--background-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.performance-overview {
+    margin-bottom: 2rem;
+}
+
+.performance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.performance-metric {
+    background: var(--background-primary);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.metric-label {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.metric-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.metric-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--background-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.metric-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+    transition: width 0.6s ease;
+}
+
+.sectional-analysis {
+    margin-bottom: 2rem;
+}
+
+.subjects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.subject-card {
+    background: var(--background-primary);
+    padding: 1.5rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.subject-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.subject-card h4 {
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.subject-score {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.75rem;
+}
+
+.subject-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.subject-stats .stat {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.subject-progress {
+    margin-top: 1rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--background-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary-color);
+    transition: width 0.8s ease;
+    border-radius: 3px;
+}
+
+.time-analysis {
+    margin-bottom: 2rem;
+}
+
+.time-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.time-stat {
+    background: var(--background-primary);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.time-label {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.time-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.timing-distribution {
+    margin-top: 1.5rem;
+}
+
+.timing-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.timing-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.timing-label {
+    flex: 0 0 140px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.timing-progress {
+    flex: 1;
+    height: 20px;
+    background: var(--background-secondary);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.timing-fill {
+    height: 100%;
+    transition: width 0.8s ease;
+    border-radius: 10px;
+}
+
+.timing-fill.fast {
+    background: var(--warning-color);
+}
+
+.timing-fill.optimal {
+    background: var(--success-color);
+}
+
+.timing-fill.slow {
+    background: var(--danger-color);
+}
+
+.timing-count {
+    flex: 0 0 40px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.insights-section {
+    margin-bottom: 2rem;
+}
+
+.insights-section > div {
+    margin-bottom: 1.5rem;
+}
+
+.insights-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0 0;
+}
+
+.insights-list li {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    border-left: 4px solid;
+    background: var(--background-primary);
+}
+
+.strength-item {
+    border-left-color: var(--success-color);
+    background: rgba(46, 213, 115, 0.1);
+}
+
+.weakness-item {
+    border-left-color: var(--danger-color);
+    background: rgba(255, 71, 87, 0.1);
+}
+
+.recommendation-item {
+    border-left-color: var(--primary-color);
+    background: rgba(55, 66, 250, 0.1);
+}
+
+.comparison-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--background-primary);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.comparison-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.comparison-item {
+    text-align: center;
+    padding: 1rem;
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.comparison-item.improvement {
+    background: rgba(46, 213, 115, 0.1);
+    border: 1px solid var(--success-color);
+}
+
+.comparison-item.decline {
+    background: rgba(255, 71, 87, 0.1);
+    border: 1px solid var(--danger-color);
+}
+
+.comparison-label {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.comparison-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.comparison-item.improvement .comparison-value {
+    color: var(--success-color);
+}
+
+.comparison-item.decline .comparison-value {
+    color: var(--danger-color);
+}
+
+.new-best {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: linear-gradient(90deg, var(--success-color), var(--primary-color));
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(46, 213, 115, 0.3);
+}
+
+.export-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--background-secondary);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.export-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.export-buttons .btn {
+    flex: 1;
+    min-width: 160px;
+}
+
+.export-note {
+    margin: 1rem 0 0 0;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Responsive design for advanced analytics */
+@media (max-width: 768px) {
+    .performance-grid,
+    .subjects-grid,
+    .comparison-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .timing-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    
+    .timing-label {
+        flex: none;
+        text-align: center;
+    }
+    
+    .timing-count {
+        flex: none;
+        text-align: center;
+    }
+    
+    .export-buttons {
+        flex-direction: column;
+    }
+    
+    .export-buttons .btn {
+        min-width: auto;
+    }
+}
