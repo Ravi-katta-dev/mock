@@ -61,6 +61,10 @@ class UserManager {
                 if (this.currentUser) {
                     console.log('Restored user session:', this.currentUser.name);
                     this.updateLastActivity();
+                    // Automatically transition to main app since user already exists
+                    setTimeout(() => {
+                        this.showMainApp();
+                    }, 100);
                 }
             }
 
