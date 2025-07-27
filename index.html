@@ -32,25 +32,37 @@
 </head>
 <body>
     <!-- Welcome Screen -->
-    <div id="welcomeScreen" class="welcome-screen">
+    <div id="welcomeScreen" class="welcome-screen" role="main" aria-labelledby="welcome-title">
         <div class="welcome-content">
-            <h1>RRB Technician Grade-3 Signal Mock Test</h1>
+            <h1 id="welcome-title">RRB Technician Grade-3 Signal Mock Test</h1>
             <p>Welcome to your comprehensive exam preparation platform</p>
-            <button id="createUserBtn" class="btn btn--primary btn--lg">Create User Profile</button>
+            <button id="createUserBtn" class="btn btn--primary btn--lg" aria-describedby="welcome-description">
+                <span aria-hidden="true">👤</span>
+                Create User Profile
+            </button>
+            <p id="welcome-description" class="sr-only">Click to create your user profile and start using the mock test platform</p>
         </div>
     </div>
 
     <!-- User Creation Modal -->
-    <div id="userModal" class="modal hidden">
+    <div id="userModal" class="modal hidden" role="dialog" aria-labelledby="user-modal-title" aria-modal="true">
         <div class="modal-content">
-            <h2>Create User Profile</h2>
+            <h2 id="user-modal-title">Create User Profile</h2>
             <div class="form-group">
-                <label class="form-label">Enter Your Name:</label>
-                <input type="text" id="userName" class="form-control" placeholder="Your Name" required>
+                <label for="userName" class="form-label required">Enter Your Name:</label>
+                <input type="text" id="userName" class="form-control" placeholder="Your Name" required aria-required="true" aria-describedby="user-name-help">
+                <div id="user-name-help" class="form-help">This name will be used to track your progress and test results</div>
             </div>
             <div class="modal-actions">
-                <button id="saveUserBtn" class="btn btn--primary">Save Profile</button>
-                <button id="cancelUserBtn" class="btn btn--secondary">Cancel</button>
+                <button id="saveUserBtn" class="btn btn--primary" aria-describedby="save-user-desc">
+                    <span aria-hidden="true">💾</span>
+                    Save Profile
+                </button>
+                <button id="cancelUserBtn" class="btn btn--secondary">
+                    <span aria-hidden="true">❌</span>
+                    Cancel
+                </button>
+                <div id="save-user-desc" class="sr-only">Save your profile to continue to the main application</div>
             </div>
         </div>
     </div>
@@ -58,64 +70,77 @@
     <!-- Main Application -->
     <div id="mainApp" class="main-app hidden">
         <!-- Header -->
-        <header class="app-header">
+        <header class="app-header" role="banner">
             <div class="header-content">
                 <h1>RRB Mock Test</h1>
                 <div class="user-info">
-                    <span id="currentUser">Welcome!</span>
-                    <button id="switchUserBtn" class="btn btn--secondary btn--sm">Switch User</button>
+                    <span id="currentUser" role="status" aria-live="polite">Welcome!</span>
+                    <button id="switchUserBtn" class="btn btn--secondary btn--sm" aria-label="Switch to different user account">
+                        <span aria-hidden="true">🔄</span>
+                        Switch User
+                    </button>
                 </div>
             </div>
         </header>
 
         <!-- Sidebar Navigation -->
-        <nav class="sidebar">
+        <nav class="sidebar" role="navigation" aria-label="Main navigation">
             <ul class="nav-menu">
-                <li><a href="#" class="nav-link active" data-section="dashboard">📊 Dashboard</a></li>
-                <li><a href="#" class="nav-link" data-section="questionBank">📚 Question Bank</a></li>
-                <li><a href="#" class="nav-link" data-section="testSelection">✏️ Take Tests</a></li>
-                <li><a href="#" class="nav-link" data-section="analytics">📈 Analytics</a></li>
-                <li><a href="#" class="nav-link" data-section="studyMaterials">📄 Study Materials</a></li>
+                <li><a href="#" class="nav-link active" data-section="dashboard" aria-current="page" aria-label="Dashboard - View your test statistics and quick actions">
+                    <span aria-hidden="true">📊</span> Dashboard
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="questionBank" aria-label="Question Bank - Manage and browse questions">
+                    <span aria-hidden="true">📚</span> Question Bank
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="testSelection" aria-label="Take Tests - Start practice tests and mock exams">
+                    <span aria-hidden="true">✏️</span> Take Tests
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="analytics" aria-label="Analytics - View detailed performance analysis">
+                    <span aria-hidden="true">📈</span> Analytics
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="studyMaterials" aria-label="Study Materials - Access PDF documents and study resources">
+                    <span aria-hidden="true">📄</span> Study Materials
+                </a></li>
             </ul>
         </nav>
 
         <!-- Main Content Area -->
-        <main class="main-content">
+        <main class="main-content" role="main">
             <!-- Dashboard Section -->
-            <section id="dashboard" class="content-section active">
-                <h2>Dashboard</h2>
-                <div class="dashboard-grid">
-                    <div class="stats-card">
-                        <h3>Total Tests Taken</h3>
-                        <div class="stat-value" id="totalTests">0</div>
+            <section id="dashboard" class="content-section active" aria-labelledby="dashboard-title">
+                <h2 id="dashboard-title">Dashboard</h2>
+                <div class="dashboard-grid" role="region" aria-label="Performance statistics">
+                    <div class="stats-card" role="group" aria-labelledby="total-tests-title">
+                        <h3 id="total-tests-title">Total Tests Taken</h3>
+                        <div class="stat-value" id="totalTests" aria-live="polite">0</div>
                     </div>
-                    <div class="stats-card">
-                        <h3>Average Score</h3>
-                        <div class="stat-value" id="averageScore">0%</div>
+                    <div class="stats-card" role="group" aria-labelledby="avg-score-title">
+                        <h3 id="avg-score-title">Average Score</h3>
+                        <div class="stat-value" id="averageScore" aria-live="polite">0%</div>
                     </div>
-                    <div class="stats-card">
-                        <h3>Best Score</h3>
-                        <div class="stat-value" id="bestScore">0%</div>
+                    <div class="stats-card" role="group" aria-labelledby="best-score-title">
+                        <h3 id="best-score-title">Best Score</h3>
+                        <div class="stat-value" id="bestScore" aria-live="polite">0%</div>
                     </div>
-                    <div class="stats-card">
-                        <h3>Questions in Bank</h3>
-                        <div class="stat-value" id="totalQuestions">0</div>
+                    <div class="stats-card" role="group" aria-labelledby="total-questions-title">
+                        <h3 id="total-questions-title">Questions in Bank</h3>
+                        <div class="stat-value" id="totalQuestions" aria-live="polite">0</div>
                     </div>
                 </div>
 
-                <div class="quick-actions">
-                    <h3>Quick Actions</h3>
+                <div class="quick-actions" role="region" aria-labelledby="quick-actions-title">
+                    <h3 id="quick-actions-title">Quick Actions</h3>
                     <div class="action-cards">
-                        <div class="action-card" data-action="fullMockTest">
-                            <h4>🎯 Full Mock Test</h4>
+                        <div class="action-card" data-action="fullMockTest" role="button" tabindex="0" aria-label="Start full mock test with 100 questions" onkeydown="if(event.key==='Enter'||event.key===' '){this.click()}">
+                            <h4><span aria-hidden="true">🎯</span> Full Mock Test</h4>
                             <p>Complete exam simulation with 100 questions</p>
                         </div>
-                        <div class="action-card" data-action="customTest">
-                            <h4>⚙️ Custom Test</h4>
+                        <div class="action-card" data-action="customTest" role="button" tabindex="0" aria-label="Create your personalized test" onkeydown="if(event.key==='Enter'||event.key===' '){this.click()}">
+                            <h4><span aria-hidden="true">⚙️</span> Custom Test</h4>
                             <p>Create your personalized test</p>
                         </div>
-                        <div class="action-card" data-action="pyqTest">
-                            <h4>📋 PYQ Test</h4>
+                        <div class="action-card" data-action="pyqTest" role="button" tabindex="0" aria-label="Practice with previous year questions" onkeydown="if(event.key==='Enter'||event.key===' '){this.click()}">
+                            <h4><span aria-hidden="true">📋</span> PYQ Test</h4>
                             <p>Practice with previous year questions</p>
                         </div>
                     </div>
