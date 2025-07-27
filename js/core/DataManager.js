@@ -52,6 +52,14 @@ class DataManager {
     }
 
     /**
+     * Initialize the DataManager module (for compatibility with module system)
+     */
+    init() {
+        console.log('DataManager already initialized');
+        return Promise.resolve();
+    }
+
+    /**
      * Generic data storage method with validation
      * @param {string} key - Storage key
      * @param {any} data - Data to store
