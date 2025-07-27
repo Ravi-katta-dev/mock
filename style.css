@@ -1051,6 +1051,33 @@ select.form-control {
   font-weight: var(--font-weight-medium);
 }
 
+/* Visual Detection Badges */
+.visual-detection-badge {
+  background: rgba(34, 197, 94, 0.1);
+  color: #059669;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--space-8);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.visual-partial-badge {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--space-8);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
 /* Test Selection */
 .test-types {
   display: grid;
