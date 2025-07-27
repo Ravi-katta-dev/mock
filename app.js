@@ -934,6 +934,13 @@ class MockTestApp {
                             </label>
                             <small class="form-help">When enabled, the system will analyze question content and suggest appropriate chapters based on the RRB syllabus.</small>
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="enableVisualDetection" checked> 
+                                🎨 Visual Highlight Detection (NEW!)
+                            </label>
+                            <small class="form-help">Automatically detect correct answers from visual highlights (light green, yellow, etc.) in the PDF. Great for answer key PDFs with highlighted correct options.</small>
+                        </div>
                         <div class="form-help">
                             <p><small>💡 These values will be applied to all extracted questions</small></p>
                         </div>
@@ -1968,6 +1975,7 @@ class MockTestApp {
         const chapterElement = document.getElementById('pdfChapter');
         const chapterCustomElement = document.getElementById('pdfChapterCustom');
         const autoDetectElement = document.getElementById('autoDetectChapter');
+        const enableVisualDetectionElement = document.getElementById('enableVisualDetection');
         
         console.log('Form elements found:', {
             subjectElement: !!subjectElement,
@@ -1975,7 +1983,8 @@ class MockTestApp {
             chapterCustomElement: !!chapterCustomElement,
             subjectValue: subjectElement?.value,
             chapterValue: chapterElement?.value,
-            chapterCustomValue: chapterCustomElement?.value
+            chapterCustomValue: chapterCustomElement?.value,
+            visualDetectionEnabled: enableVisualDetectionElement?.checked
         });
 
         if (!subjectElement?.value || subjectElement.value === '') {
@@ -1993,6 +2002,7 @@ class MockTestApp {
         }
         
         const isAutoDetectEnabled = autoDetectElement?.checked !== false;
+        const isVisualDetectionEnabled = enableVisualDetectionElement?.checked !== false;
         
         // For auto-detection or mixed subjects, we can proceed without chapter initially
         if (!chapterValue && !isAutoDetectEnabled && subjectElement.value !== 'Mixed/Practice Books') {
@@ -2006,7 +2016,8 @@ class MockTestApp {
             subject: subjectElement.value,
             chapter: chapterValue || 'Auto-detect',
             filename: this.currentPDFFile.name,
-            autoDetect: isAutoDetectEnabled
+            autoDetect: isAutoDetectEnabled,
+            visualDetection: isVisualDetectionEnabled
         };
 
         console.log('Stored PDF metadata:', this.currentPDFMetadata);
@@ -2020,6 +2031,7 @@ class MockTestApp {
                     <p>Subject: <strong>${this.currentPDFMetadata.subject}</strong></p>
                     <p>Chapter: <strong>${this.currentPDFMetadata.chapter}</strong></p>
                     ${isAutoDetectEnabled ? '<p>🤖 AI Chapter Detection: <strong>Enabled</strong></p>' : ''}
+                    ${isVisualDetectionEnabled ? '<p>🎨 Visual Highlight Detection: <strong>Enabled</strong></p>' : ''}
                     <div class="progress-details">
                         <p id="processingStep">Initializing PDF processing...</p>
                     </div>
@@ -2039,7 +2051,9 @@ class MockTestApp {
             let fullText = '';
             let pageTexts = [];
             
-            // Extract text page by page for better processing
+            // Extract text and visual information page by page for better processing
+            let pageVisualData = [];
+            
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
@@ -2057,7 +2071,10 @@ class MockTestApp {
                 pageTexts.push(pageText);
                 fullText += pageText + '\n\n--- PAGE_BREAK ---\n\n';
                 
-                this.updateProcessingStep(`Processing page ${i} of ${pdf.numPages}...`);
+                // Extract visual highlight data for each page
+                this.updateProcessingStep(`Processing page ${i} of ${pdf.numPages} (including visual analysis)...`);
+                const visualData = await this.extractPageVisualData(page, pageItems);
+                pageVisualData.push(visualData);
             }
 
             this.updateProcessingStep('Analyzing question structure...');
@@ -2070,6 +2087,16 @@ class MockTestApp {
             // Multiple extraction strategies
             const extractedQuestions = this.extractQuestionsWithMultipleStrategies(preprocessedText, pageTexts);
             
+            let questionsWithVisualData = extractedQuestions;
+            
+            // Apply visual highlight detection if enabled
+            if (isVisualDetectionEnabled) {
+                this.updateProcessingStep('Applying visual highlight detection...');
+                questionsWithVisualData = this.applyVisualHighlightDetection(extractedQuestions, pageVisualData);
+            } else {
+                console.log('📊 Visual highlight detection disabled by user');
+            }
+            
             this.updateProcessingStep('Validating extracted questions...');
             console.log('PDF metadata before validation:', this.currentPDFMetadata);
             
@@ -2077,17 +2104,17 @@ class MockTestApp {
             let validQuestions;
             
             // Enhanced processing with optimized chunking for very large datasets (1500+ questions)
-            if (extractedQuestions.length > 1000) {
-                this.updateProcessingStep(`🚀 Large dataset detected: ${extractedQuestions.length} questions. Applying advanced optimizations...`);
+            if (questionsWithVisualData.length > 1000) {
+                this.updateProcessingStep(`🚀 Large dataset detected: ${questionsWithVisualData.length} questions. Applying advanced optimizations...`);
                 
                 // Smaller batch size for very large datasets to prevent memory issues
                 const batchSize = 50;
                 let processedQuestions = [];
                 
-                for (let i = 0; i < extractedQuestions.length; i += batchSize) {
-                    const batch = extractedQuestions.slice(i, i + batchSize);
+                for (let i = 0; i < questionsWithVisualData.length; i += batchSize) {
+                    const batch = questionsWithVisualData.slice(i, i + batchSize);
                     const batchNumber = Math.floor(i / batchSize) + 1;
-                    const totalBatches = Math.ceil(extractedQuestions.length / batchSize);
+                    const totalBatches = Math.ceil(questionsWithVisualData.length / batchSize);
                     
                     this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
                     
@@ -2098,7 +2125,7 @@ class MockTestApp {
                     processedQuestions.push(...validatedBatch);
                     
                     // Update progress with memory usage info
-                    const progress = Math.round((i + batch.length) / extractedQuestions.length * 100);
+                    const progress = Math.round((i + batch.length) / questionsWithVisualData.length * 100);
                     this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions, batch ${batchNumber}/${totalBatches})`);
                     
                     // Memory management for very large datasets
@@ -2112,17 +2139,17 @@ class MockTestApp {
                 validQuestions = processedQuestions;
                 this.updateProcessingStep(`✅ Large dataset processing complete: ${validQuestions.length} valid questions extracted`);
                 
-            } else if (extractedQuestions.length > 500) {
-                this.updateProcessingStep(`🔄 Processing medium dataset: ${extractedQuestions.length} questions found. Implementing optimizations...`);
+            } else if (questionsWithVisualData.length > 500) {
+                this.updateProcessingStep(`🔄 Processing medium dataset: ${questionsWithVisualData.length} questions found. Implementing optimizations...`);
                 
                 // Process in batches for better performance
                 const batchSize = 100;
                 let processedQuestions = [];
                 
-                for (let i = 0; i < extractedQuestions.length; i += batchSize) {
-                    const batch = extractedQuestions.slice(i, i + batchSize);
+                for (let i = 0; i < questionsWithVisualData.length; i += batchSize) {
+                    const batch = questionsWithVisualData.slice(i, i + batchSize);
                     const batchNumber = Math.floor(i / batchSize) + 1;
-                    const totalBatches = Math.ceil(extractedQuestions.length / batchSize);
+                    const totalBatches = Math.ceil(questionsWithVisualData.length / batchSize);
                     
                     this.updateProcessingStep(`⚙️ Processing batch ${batchNumber}/${totalBatches} (${batch.length} questions)...`);
                     
@@ -2133,7 +2160,7 @@ class MockTestApp {
                     processedQuestions.push(...validatedBatch);
                     
                     // Update progress
-                    const progress = Math.round((i + batch.length) / extractedQuestions.length * 100);
+                    const progress = Math.round((i + batch.length) / questionsWithVisualData.length * 100);
                     this.updateProcessingStep(`📊 Progress: ${progress}% (${processedQuestions.length} valid questions processed)`);
                 }
                 
@@ -2141,7 +2168,7 @@ class MockTestApp {
                 this.updateProcessingStep(`✅ Medium dataset processing complete: ${validQuestions.length} valid questions`);
             } else {
                 // Filter and validate questions normally for smaller datasets
-                validQuestions = this.validateAndFilterQuestions(extractedQuestions);
+                validQuestions = this.validateAndFilterQuestions(questionsWithVisualData);
             }
             
             // AI Chapter Detection
@@ -4056,6 +4083,16 @@ D) 6</pre>
             const sourceColor = validatedQuestion.source.startsWith('PDF:') ? '#f39c12' : '#27ae60';
             const needsReviewBadge = validatedQuestion.needsReview ? '<span class="review-badge">Needs Review</span>' : '';
             
+            // Visual highlight detection badges
+            let visualDetectionBadges = '';
+            if (validatedQuestion.detectionMethod === 'visual_highlight') {
+                const confidence = (validatedQuestion.visualConfidence * 100).toFixed(0);
+                const color = validatedQuestion.highlightColor || 'green';
+                visualDetectionBadges = `<span class="visual-detection-badge" title="Auto-detected from ${color} highlight (${confidence}% confidence)">🎨 Visual</span>`;
+            } else if (validatedQuestion.visualHighlights && validatedQuestion.visualHighlights.length > 0) {
+                visualDetectionBadges = `<span class="visual-partial-badge" title="Visual highlights detected but needs review">🔍 Highlights</span>`;
+            }
+            
             row.innerHTML = `
                 <td>
                     <input type="checkbox" class="question-checkbox" value="${validatedQuestion.id}" onchange="app.updateDeleteButton()">
@@ -4066,6 +4103,7 @@ D) 6</pre>
                         ${validatedQuestion.text.substring(0, 100)}${validatedQuestion.text.length > 100 ? '...' : ''}
                     </div>
                     ${needsReviewBadge}
+                    ${visualDetectionBadges}
                 </td>
                 <td><span class="subject-tag">${validatedQuestion.subject}</span></td>
                 <td><span class="chapter-tag">${validatedQuestion.chapter}</span></td>
@@ -6906,6 +6944,415 @@ D) 6</pre>
             
             console.log('✅ Large dataset optimizations applied');
         }
+    }
+
+    // ========================================================================
+    // VISUAL HIGHLIGHT DETECTION METHODS
+    // ========================================================================
+
+    /**
+     * Extract visual data from a PDF page including color information for highlight detection
+     * @param {Object} page - PDF.js page object
+     * @param {Array} pageItems - Text items with position information
+     * @returns {Object} Visual data including highlights and color information
+     */
+    async extractPageVisualData(page, pageItems) {
+        try {
+            // Create a hidden canvas for visual analysis
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Get page viewport for rendering
+            const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better detection
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            // Render page to canvas
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+            
+            // Extract image data for color analysis
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Analyze highlights for each text item (potential options)
+            const highlights = this.detectHighlightsInTextAreas(imageData, pageItems, viewport);
+            
+            return {
+                pageNumber: page.pageNumber,
+                highlights: highlights,
+                textItems: pageItems,
+                viewport: viewport
+            };
+            
+        } catch (error) {
+            console.warn(`Visual analysis failed for page ${page.pageNumber}:`, error);
+            return {
+                pageNumber: page.pageNumber,
+                highlights: [],
+                textItems: pageItems,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Detect color highlights in text areas that might indicate correct answers
+     * @param {ImageData} imageData - Canvas image data
+     * @param {Array} textItems - Text items with position information
+     * @param {Object} viewport - Page viewport for coordinate mapping
+     * @returns {Array} Array of detected highlights with position and confidence
+     */
+    detectHighlightsInTextAreas(imageData, textItems, viewport) {
+        const highlights = [];
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+
+        // Define highlight colors to detect (light green, yellow, etc.)
+        const highlightColors = [
+            { name: 'light_green', r: [180, 255], g: [230, 255], b: [180, 255], weight: 1.0 },
+            { name: 'green', r: [120, 200], g: [200, 255], b: [120, 200], weight: 0.9 },
+            { name: 'yellow', r: [240, 255], g: [240, 255], b: [150, 220], weight: 0.8 },
+            { name: 'light_blue', r: [180, 230], g: [220, 255], b: [240, 255], weight: 0.7 },
+            { name: 'pink', r: [240, 255], g: [180, 230], b: [190, 240], weight: 0.6 }
+        ];
+
+        // Analyze each text item for surrounding highlights
+        textItems.forEach((item, index) => {
+            if (!item.text || item.text.trim().length === 0) return;
+
+            // Calculate bounding box with some padding for highlight detection
+            const padding = 10;
+            const x1 = Math.max(0, Math.floor(item.x - padding));
+            const y1 = Math.max(0, Math.floor(viewport.height - item.y - item.height - padding));
+            const x2 = Math.min(width, Math.floor(item.x + item.width + padding));
+            const y2 = Math.min(height, Math.floor(viewport.height - item.y + padding));
+
+            // Sample pixels in the text area
+            const sampleResult = this.samplePixelsInArea(data, width, x1, y1, x2, y2);
+            
+            // Check for highlight colors
+            const detectedHighlights = this.analyzeColorsForHighlights(sampleResult, highlightColors);
+            
+            if (detectedHighlights.length > 0) {
+                highlights.push({
+                    textItem: item,
+                    textIndex: index,
+                    detectedColors: detectedHighlights,
+                    confidence: Math.max(...detectedHighlights.map(h => h.confidence)),
+                    area: { x1, y1, x2, y2 },
+                    bestMatch: detectedHighlights[0] // Highest confidence match
+                });
+            }
+        });
+
+        // Sort by confidence descending
+        highlights.sort((a, b) => b.confidence - a.confidence);
+
+        console.log(`🎨 Visual analysis: Found ${highlights.length} potential highlights on page`);
+        return highlights;
+    }
+
+    /**
+     * Sample pixels in a specified area and return color statistics
+     * @param {Uint8ClampedArray} data - Image data array
+     * @param {number} width - Image width
+     * @param {number} x1 - Start x coordinate
+     * @param {number} y1 - Start y coordinate  
+     * @param {number} x2 - End x coordinate
+     * @param {number} y2 - End y coordinate
+     * @returns {Object} Color statistics for the area
+     */
+    samplePixelsInArea(data, width, x1, y1, x2, y2) {
+        const colors = [];
+        const sampleStep = 3; // Sample every 3rd pixel for performance
+
+        for (let y = y1; y < y2; y += sampleStep) {
+            for (let x = x1; x < x2; x += sampleStep) {
+                const index = (y * width + x) * 4;
+                if (index + 3 < data.length) {
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    const a = data[index + 3];
+                    
+                    // Skip transparent pixels
+                    if (a > 200) {
+                        colors.push({ r, g, b });
+                    }
+                }
+            }
+        }
+
+        return {
+            colors: colors,
+            totalPixels: colors.length,
+            averageColor: this.calculateAverageColor(colors)
+        };
+    }
+
+    /**
+     * Calculate average color from an array of color values
+     * @param {Array} colors - Array of {r, g, b} color objects
+     * @returns {Object} Average color
+     */
+    calculateAverageColor(colors) {
+        if (colors.length === 0) return { r: 255, g: 255, b: 255 };
+
+        const total = colors.reduce(
+            (acc, color) => ({
+                r: acc.r + color.r,
+                g: acc.g + color.g,
+                b: acc.b + color.b
+            }),
+            { r: 0, g: 0, b: 0 }
+        );
+
+        return {
+            r: Math.round(total.r / colors.length),
+            g: Math.round(total.g / colors.length),
+            b: Math.round(total.b / colors.length)
+        };
+    }
+
+    /**
+     * Analyze sampled colors to detect highlight patterns
+     * @param {Object} sampleResult - Result from samplePixelsInArea
+     * @param {Array} highlightColors - Predefined highlight color patterns
+     * @returns {Array} Array of detected highlight matches with confidence
+     */
+    analyzeColorsForHighlights(sampleResult, highlightColors) {
+        const detectedHighlights = [];
+        const { colors, averageColor } = sampleResult;
+
+        if (colors.length === 0) return detectedHighlights;
+
+        // Check average color against known highlight patterns
+        highlightColors.forEach(pattern => {
+            const confidence = this.calculateColorMatchConfidence(averageColor, pattern);
+            
+            if (confidence > 0.3) { // Minimum confidence threshold
+                detectedHighlights.push({
+                    colorName: pattern.name,
+                    confidence: confidence * pattern.weight,
+                    averageColor: averageColor,
+                    pattern: pattern
+                });
+            }
+        });
+
+        // Also check for color consistency (uniform highlighting)
+        const colorVariance = this.calculateColorVariance(colors);
+        const uniformityBonus = Math.max(0, (1.0 - colorVariance) * 0.2);
+
+        // Apply uniformity bonus to increase confidence
+        detectedHighlights.forEach(highlight => {
+            highlight.confidence = Math.min(1.0, highlight.confidence + uniformityBonus);
+        });
+
+        // Sort by confidence descending
+        detectedHighlights.sort((a, b) => b.confidence - a.confidence);
+
+        return detectedHighlights;
+    }
+
+    /**
+     * Calculate how well a color matches a highlight pattern
+     * @param {Object} color - Color to test {r, g, b}
+     * @param {Object} pattern - Highlight pattern with color ranges
+     * @returns {number} Confidence score (0-1)
+     */
+    calculateColorMatchConfidence(color, pattern) {
+        const { r, g, b } = color;
+        
+        // Check if color falls within pattern ranges
+        const rMatch = r >= pattern.r[0] && r <= pattern.r[1];
+        const gMatch = g >= pattern.g[0] && g <= pattern.g[1];
+        const bMatch = b >= pattern.b[0] && b <= pattern.b[1];
+
+        if (!rMatch || !gMatch || !bMatch) return 0;
+
+        // Calculate how close to the center of the range
+        const rCenter = (pattern.r[0] + pattern.r[1]) / 2;
+        const gCenter = (pattern.g[0] + pattern.g[1]) / 2;
+        const bCenter = (pattern.b[0] + pattern.b[1]) / 2;
+
+        const rDistance = Math.abs(r - rCenter) / (pattern.r[1] - pattern.r[0]);
+        const gDistance = Math.abs(g - gCenter) / (pattern.g[1] - pattern.g[0]);
+        const bDistance = Math.abs(b - bCenter) / (pattern.b[1] - pattern.b[0]);
+
+        const avgDistance = (rDistance + gDistance + bDistance) / 3;
+        return 1.0 - avgDistance;
+    }
+
+    /**
+     * Calculate color variance to detect uniform highlighting
+     * @param {Array} colors - Array of color objects
+     * @returns {number} Variance score (0-1, lower is more uniform)
+     */
+    calculateColorVariance(colors) {
+        if (colors.length < 2) return 0;
+
+        const avg = this.calculateAverageColor(colors);
+        
+        const variance = colors.reduce((acc, color) => {
+            const rDiff = (color.r - avg.r) / 255;
+            const gDiff = (color.g - avg.g) / 255;
+            const bDiff = (color.b - avg.b) / 255;
+            return acc + (rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+        }, 0) / colors.length;
+
+        return Math.sqrt(variance);
+    }
+
+    /**
+     * Apply visual highlight detection to extracted questions
+     * @param {Array} questions - Extracted questions from text parsing
+     * @param {Array} pageVisualData - Visual data from all pages
+     * @returns {Array} Questions with visual highlight information applied
+     */
+    applyVisualHighlightDetection(questions, pageVisualData) {
+        console.log('🎨 Applying visual highlight detection to questions...');
+        
+        let highlightDetectionCount = 0;
+        let autoCorrectCount = 0;
+
+        questions.forEach((question, qIndex) => {
+            if (!question.options || question.options.length !== 4) return;
+
+            // Find relevant page data for this question
+            const relevantHighlights = this.findRelevantHighlights(question, pageVisualData);
+            
+            if (relevantHighlights.length > 0) {
+                highlightDetectionCount++;
+                
+                // Try to map highlights to options
+                const optionHighlights = this.mapHighlightsToOptions(question.options, relevantHighlights);
+                
+                if (optionHighlights.correctOption !== -1) {
+                    autoCorrectCount++;
+                    
+                    // Auto-set correct answer if confidence is high enough
+                    if (optionHighlights.confidence > 0.7) {
+                        question.correctAnswer = optionHighlights.correctOption;
+                        question.detectionMethod = 'visual_highlight';
+                        question.visualConfidence = optionHighlights.confidence;
+                        question.highlightColor = optionHighlights.highlightColor;
+                        
+                        console.log(`✅ Auto-detected correct answer for Q${qIndex + 1}: Option ${String.fromCharCode(65 + optionHighlights.correctOption)} (${optionHighlights.confidence.toFixed(2)} confidence)`);
+                    } else {
+                        // Mark for review if confidence is moderate
+                        question.needsReview = true;
+                        question.reviewReason = `Visual highlight detected but confidence low (${optionHighlights.confidence.toFixed(2)})`;
+                        question.suggestedAnswer = optionHighlights.correctOption;
+                        question.visualConfidence = optionHighlights.confidence;
+                        
+                        console.log(`⚠️ Q${qIndex + 1} marked for review: Low confidence visual detection`);
+                    }
+                } else if (relevantHighlights.length > 0) {
+                    // Highlights found but couldn't map to specific option
+                    question.needsReview = true;
+                    question.reviewReason = 'Visual highlights detected but could not determine correct option';
+                    
+                    console.log(`🔍 Q${qIndex + 1} marked for review: Highlights found but ambiguous`);
+                }
+                
+                // Store highlight data for debugging/review
+                question.visualHighlights = relevantHighlights.map(h => ({
+                    confidence: h.confidence,
+                    color: h.bestMatch?.colorName,
+                    area: h.area
+                }));
+            }
+        });
+
+        console.log(`🎨 Visual highlight detection complete:`);
+        console.log(`   • Questions with highlights detected: ${highlightDetectionCount}`);
+        console.log(`   • Questions auto-corrected: ${autoCorrectCount}`);
+        console.log(`   • Detection success rate: ${highlightDetectionCount > 0 ? ((autoCorrectCount / highlightDetectionCount) * 100).toFixed(1) : 0}%`);
+
+        return questions;
+    }
+
+    /**
+     * Find highlights relevant to a specific question
+     * @param {Object} question - Question object
+     * @param {Array} pageVisualData - Visual data from all pages
+     * @returns {Array} Relevant highlights for this question
+     */
+    findRelevantHighlights(question, pageVisualData) {
+        const relevantHighlights = [];
+
+        pageVisualData.forEach(pageData => {
+            if (!pageData.highlights || pageData.highlights.length === 0) return;
+
+            // Look for highlights near option-like text patterns
+            pageData.highlights.forEach(highlight => {
+                const text = highlight.textItem.text.trim();
+                
+                // Check if text looks like an option (A), B), C), D) or similar
+                const isOptionLike = /^[A-D][\)\.]\s*\w+/.test(text) || 
+                                   /^\([A-D]\)\s*\w+/.test(text) ||
+                                   /^[a-d][\)\.]\s*\w+/.test(text) ||
+                                   /^\([a-d]\)\s*\w+/.test(text);
+
+                if (isOptionLike && highlight.confidence > 0.4) {
+                    relevantHighlights.push(highlight);
+                }
+            });
+        });
+
+        // Sort by confidence
+        relevantHighlights.sort((a, b) => b.confidence - a.confidence);
+        
+        return relevantHighlights;
+    }
+
+    /**
+     * Map detected highlights to question options
+     * @param {Array} options - Question options array
+     * @param {Array} highlights - Relevant highlights
+     * @returns {Object} Mapping result with correct option and confidence
+     */
+    mapHighlightsToOptions(options, highlights) {
+        if (highlights.length === 0) {
+            return { correctOption: -1, confidence: 0 };
+        }
+
+        // Look for exactly one high-confidence highlight
+        const highConfidenceHighlights = highlights.filter(h => h.confidence > 0.6);
+        
+        if (highConfidenceHighlights.length === 1) {
+            const highlight = highConfidenceHighlights[0];
+            const text = highlight.textItem.text.trim();
+            
+            // Extract option letter
+            const optionMatch = text.match(/^[A-D][\)\.]/i) || text.match(/^\([A-D]\)/i) || 
+                               text.match(/^[a-d][\)\.]/i) || text.match(/^\([a-d]\)/i);
+            
+            if (optionMatch) {
+                const optionLetter = optionMatch[0].replace(/[\(\)\.\s]/g, '').toUpperCase();
+                const optionIndex = optionLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+                
+                if (optionIndex >= 0 && optionIndex < 4) {
+                    return {
+                        correctOption: optionIndex,
+                        confidence: highlight.confidence,
+                        highlightColor: highlight.bestMatch?.colorName || 'unknown',
+                        highlightData: highlight
+                    };
+                }
+            }
+        }
+
+        // If multiple highlights or can't determine, return no match
+        return { 
+            correctOption: -1, 
+            confidence: 0,
+            reason: highlights.length > 1 ? 'multiple_highlights' : 'unrecognized_pattern'
+        };
     }
 }
 
