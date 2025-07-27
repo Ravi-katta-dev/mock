@@ -2060,6 +2060,10 @@ class MockTestApp {
             const fileArrayBuffer = await this.currentPDFFile.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(fileArrayBuffer).promise;
             
+            // Step 1: Advanced Layout Analysis
+            this.updateProcessingStep('🔍 Analyzing document layout and structure...');
+            this.layoutAnalysis = await this.analyzeDocumentLayout(pdf);
+            
             this.updateProcessingStep('Extracting text from pages...');
             
             let fullText = '';
@@ -2096,7 +2100,7 @@ class MockTestApp {
             // Enhanced text preprocessing
             const preprocessedText = this.preprocessPDFText(fullText);
             
-            this.updateProcessingStep('Extracting questions using multiple strategies...');
+            this.updateProcessingStep('🧠 Extracting questions using enhanced strategies (layout-aware, table detection, multi-column support)...');
             
             // Multiple extraction strategies
             const extractedQuestions = this.extractQuestionsWithMultipleStrategies(preprocessedText, pageTexts);
@@ -2582,12 +2586,12 @@ class MockTestApp {
     }
 
     extractQuestionsWithMultipleStrategies(text, pageTexts) {
-        console.log('Starting question extraction with multiple strategies...');
+        console.log('Starting enhanced question extraction with layout analysis...');
         console.log('Current PDF metadata at extraction start:', this.currentPDFMetadata);
         
         const allQuestions = [];
         
-        // Strategy 1: Line-by-line parsing
+        // Strategy 1: Line-by-line parsing (existing)
         try {
             const strategy1Questions = this.extractQuestionsLineByLine(text);
             console.log('Strategy 1 (Line-by-line) found:', strategy1Questions.length, 'questions');
@@ -2596,7 +2600,7 @@ class MockTestApp {
             console.error('Strategy 1 failed:', error);
         }
         
-        // Strategy 2: Pattern-based extraction
+        // Strategy 2: Pattern-based extraction (existing)
         try {
             const strategy2Questions = this.extractQuestionsWithPatterns(text);
             console.log('Strategy 2 (Pattern-based) found:', strategy2Questions.length, 'questions');
@@ -2605,7 +2609,7 @@ class MockTestApp {
             console.error('Strategy 2 failed:', error);
         }
         
-        // Strategy 3: Block-based extraction
+        // Strategy 3: Block-based extraction (existing)
         try {
             const strategy3Questions = this.extractQuestionsBlockBased(text);
             console.log('Strategy 3 (Block-based) found:', strategy3Questions.length, 'questions');
@@ -2614,11 +2618,44 @@ class MockTestApp {
             console.error('Strategy 3 failed:', error);
         }
         
+        // Strategy 4: Layout-aware extraction (NEW)
+        try {
+            if (this.layoutAnalysis) {
+                const strategy4Questions = this.extractQuestionsWithLayoutAnalysis(this.layoutAnalysis);
+                console.log('Strategy 4 (Layout-aware) found:', strategy4Questions.length, 'questions');
+                allQuestions.push(...strategy4Questions);
+            }
+        } catch (error) {
+            console.error('Strategy 4 failed:', error);
+        }
+        
+        // Strategy 5: Table-based extraction (NEW)
+        try {
+            if (this.layoutAnalysis && this.layoutAnalysis.tableRegions.length > 0) {
+                const strategy5Questions = this.extractQuestionsFromTables(this.layoutAnalysis.tableRegions);
+                console.log('Strategy 5 (Table-based) found:', strategy5Questions.length, 'questions');
+                allQuestions.push(...strategy5Questions);
+            }
+        } catch (error) {
+            console.error('Strategy 5 failed:', error);
+        }
+        
+        // Strategy 6: Multi-column aware extraction (NEW)
+        try {
+            if (this.layoutAnalysis && this.layoutAnalysis.readingOrder.length > 0) {
+                const strategy6Questions = this.extractQuestionsWithReadingOrder(this.layoutAnalysis.readingOrder);
+                console.log('Strategy 6 (Multi-column aware) found:', strategy6Questions.length, 'questions');
+                allQuestions.push(...strategy6Questions);
+            }
+        } catch (error) {
+            console.error('Strategy 6 failed:', error);
+        }
+        
         console.log('Current PDF metadata before finalization:', this.currentPDFMetadata);
         
         // Remove duplicates based on question text similarity
         const uniqueQuestions = this.removeDuplicateQuestions(allQuestions);
-        console.log('Final unique questions after deduplication:', uniqueQuestions.length);
+        console.log('Final unique questions after enhanced extraction:', uniqueQuestions.length);
         
         return uniqueQuestions;
     }
@@ -4293,6 +4330,540 @@ D) 6</pre>
             
             alert(`Successfully deleted "${pdf.name}" and its ${pdf.questionsExtracted} questions.`);
         }
+    }
+
+    // ========================================================================
+    // NEW ENHANCED EXTRACTION STRATEGIES
+    // ========================================================================
+
+    /**
+     * Extract questions using layout analysis for complex document structures
+     */
+    extractQuestionsWithLayoutAnalysis(layoutAnalysis) {
+        console.log('🔍 Extracting questions using layout analysis...');
+        const questions = [];
+        
+        if (!layoutAnalysis || !layoutAnalysis.pageLayouts) {
+            return questions;
+        }
+        
+        layoutAnalysis.pageLayouts.forEach(pageLayout => {
+            try {
+                const pageQuestions = this.extractQuestionsFromPageLayout(pageLayout);
+                questions.push(...pageQuestions);
+            } catch (error) {
+                console.error(`Error extracting from page ${pageLayout.pageNum}:`, error);
+            }
+        });
+        
+        console.log(`📄 Layout-based extraction found ${questions.length} questions`);
+        return questions;
+    }
+
+    /**
+     * Extract questions from a specific page layout
+     */
+    extractQuestionsFromPageLayout(pageLayout) {
+        const questions = [];
+        const { textItems, lineGroups } = pageLayout;
+        
+        if (!textItems || textItems.length === 0) {
+            return questions;
+        }
+        
+        // Use line groups for better text reconstruction
+        let currentQuestion = null;
+        let questionNumber = 0;
+        
+        lineGroups.forEach((line, lineIndex) => {
+            const lineText = line.text.trim();
+            
+            // Check for question start patterns
+            const questionMatch = this.detectQuestionStart(lineText, line.items);
+            
+            if (questionMatch) {
+                // Finalize previous question
+                if (currentQuestion && this.isQuestionComplete(currentQuestion)) {
+                    questions.push(this.finalizeQuestion(currentQuestion));
+                }
+                
+                // Start new question
+                questionNumber = questionMatch.number;
+                currentQuestion = {
+                    number: questionNumber,
+                    text: questionMatch.text,
+                    options: [],
+                    layout: {
+                        startLine: lineIndex,
+                        startY: line.y,
+                        bounds: { left: line.left, right: line.right }
+                    },
+                    source: 'Layout-aware extraction'
+                };
+            } else if (currentQuestion) {
+                // Check for options
+                const optionMatch = this.detectOptionInLine(lineText, line.items);
+                
+                if (optionMatch && currentQuestion.options.length < 4) {
+                    currentQuestion.options.push(optionMatch.text);
+                    
+                    // Update question bounds
+                    currentQuestion.layout.bounds.left = Math.min(
+                        currentQuestion.layout.bounds.left, line.left
+                    );
+                    currentQuestion.layout.bounds.right = Math.max(
+                        currentQuestion.layout.bounds.right, line.right
+                    );
+                } else if (!this.isOptionLine(lineText) && currentQuestion.options.length === 0) {
+                    // Continuation of question text
+                    if (currentQuestion.text.length < 500) {
+                        currentQuestion.text += ' ' + lineText;
+                    }
+                }
+            }
+        });
+        
+        // Don't forget the last question
+        if (currentQuestion && this.isQuestionComplete(currentQuestion)) {
+            questions.push(this.finalizeQuestion(currentQuestion));
+        }
+        
+        return questions;
+    }
+
+    /**
+     * Extract questions from detected table regions
+     */
+    extractQuestionsFromTables(tableRegions) {
+        console.log('📊 Extracting questions from table regions...');
+        const questions = [];
+        
+        tableRegions.forEach((table, tableIndex) => {
+            try {
+                const tableQuestions = this.extractQuestionsFromTable(table, tableIndex);
+                questions.push(...tableQuestions);
+            } catch (error) {
+                console.error(`Error extracting from table ${tableIndex}:`, error);
+            }
+        });
+        
+        console.log(`📊 Table-based extraction found ${questions.length} questions`);
+        return questions;
+    }
+
+    /**
+     * Extract questions from a single table structure
+     */
+    extractQuestionsFromTable(table, tableIndex) {
+        const questions = [];
+        const { lines, columns } = table;
+        
+        if (!lines || lines.length < 2) {
+            return questions;
+        }
+        
+        // Analyze table structure to identify question-option relationships
+        let currentQuestion = null;
+        let questionColumn = -1;
+        let optionColumns = [];
+        
+        // Detect which columns contain questions vs options
+        const structureAnalysis = this.analyzeTableStructure(table);
+        questionColumn = structureAnalysis.questionColumn;
+        optionColumns = structureAnalysis.optionColumns;
+        
+        if (questionColumn === -1) {
+            console.log('Could not identify question column in table');
+            return questions;
+        }
+        
+        lines.forEach((lineData, rowIndex) => {
+            const { line, columns: rowColumns } = lineData;
+            
+            if (rowColumns.length <= questionColumn) {
+                return; // Skip incomplete rows
+            }
+            
+            const questionCell = rowColumns[questionColumn];
+            const questionText = questionCell.text.trim();
+            
+            // Check if this looks like a question
+            const questionMatch = this.detectQuestionStart(questionText);
+            
+            if (questionMatch) {
+                // Finalize previous question
+                if (currentQuestion && this.isQuestionComplete(currentQuestion)) {
+                    questions.push(this.finalizeQuestion(currentQuestion));
+                }
+                
+                // Start new question
+                currentQuestion = {
+                    number: questionMatch.number,
+                    text: questionMatch.text,
+                    options: [],
+                    source: `Table extraction (Table ${tableIndex + 1})`,
+                    tableInfo: {
+                        tableIndex: tableIndex,
+                        rowIndex: rowIndex,
+                        questionColumn: questionColumn
+                    }
+                };
+                
+                // Extract options from other columns in the same row
+                optionColumns.forEach(optionCol => {
+                    if (rowColumns.length > optionCol && currentQuestion.options.length < 4) {
+                        const optionText = rowColumns[optionCol].text.trim();
+                        if (optionText && optionText.length > 0) {
+                            currentQuestion.options.push(optionText);
+                        }
+                    }
+                });
+                
+            } else if (currentQuestion && currentQuestion.options.length < 4) {
+                // Check if this row contains options for the current question
+                optionColumns.forEach(optionCol => {
+                    if (rowColumns.length > optionCol && currentQuestion.options.length < 4) {
+                        const optionText = rowColumns[optionCol].text.trim();
+                        if (optionText && this.isValidOptionText(optionText)) {
+                            currentQuestion.options.push(optionText);
+                        }
+                    }
+                });
+            }
+        });
+        
+        // Don't forget the last question
+        if (currentQuestion && this.isQuestionComplete(currentQuestion)) {
+            questions.push(this.finalizeQuestion(currentQuestion));
+        }
+        
+        return questions;
+    }
+
+    /**
+     * Analyze table structure to identify question and option columns
+     */
+    analyzeTableStructure(table) {
+        const { lines } = table;
+        let questionColumn = -1;
+        let optionColumns = [];
+        
+        if (!lines || lines.length === 0) {
+            return { questionColumn, optionColumns };
+        }
+        
+        // Analyze first few rows to identify structure
+        const sampleRows = lines.slice(0, Math.min(5, lines.length));
+        const columnAnalysis = [];
+        
+        // Initialize column analysis
+        const maxColumns = Math.max(...sampleRows.map(row => row.columns.length));
+        for (let col = 0; col < maxColumns; col++) {
+            columnAnalysis[col] = {
+                questionLikeTexts: 0,
+                optionLikeTexts: 0,
+                totalTexts: 0,
+                avgLength: 0
+            };
+        }
+        
+        // Analyze each column's content
+        sampleRows.forEach(row => {
+            row.columns.forEach((column, colIndex) => {
+                const text = column.text.trim();
+                if (text.length === 0) return;
+                
+                const analysis = columnAnalysis[colIndex];
+                analysis.totalTexts++;
+                analysis.avgLength += text.length;
+                
+                // Check if text looks like a question
+                if (this.detectQuestionStart(text)) {
+                    analysis.questionLikeTexts++;
+                }
+                
+                // Check if text looks like an option
+                if (this.isOptionLikeText(text)) {
+                    analysis.optionLikeTexts++;
+                }
+            });
+        });
+        
+        // Calculate averages and determine column types
+        columnAnalysis.forEach((analysis, colIndex) => {
+            if (analysis.totalTexts > 0) {
+                analysis.avgLength /= analysis.totalTexts;
+                analysis.questionRatio = analysis.questionLikeTexts / analysis.totalTexts;
+                analysis.optionRatio = analysis.optionLikeTexts / analysis.totalTexts;
+            }
+        });
+        
+        // Find question column (highest question ratio, longer text)
+        let bestQuestionScore = 0;
+        columnAnalysis.forEach((analysis, colIndex) => {
+            const score = analysis.questionRatio * 2 + (analysis.avgLength > 50 ? 1 : 0);
+            if (score > bestQuestionScore) {
+                bestQuestionScore = score;
+                questionColumn = colIndex;
+            }
+        });
+        
+        // Find option columns (excluding question column)
+        columnAnalysis.forEach((analysis, colIndex) => {
+            if (colIndex !== questionColumn && 
+                (analysis.optionRatio > 0.3 || analysis.avgLength < 100)) {
+                optionColumns.push(colIndex);
+            }
+        });
+        
+        console.log(`📊 Table structure: Question column ${questionColumn}, Option columns [${optionColumns.join(', ')}]`);
+        
+        return { questionColumn, optionColumns };
+    }
+
+    /**
+     * Extract questions using multi-column reading order
+     */
+    extractQuestionsWithReadingOrder(readingOrder) {
+        console.log('📖 Extracting questions using reading order analysis...');
+        const questions = [];
+        
+        readingOrder.forEach(pageOrder => {
+            pageOrder.sections.forEach(section => {
+                try {
+                    const sectionQuestions = this.extractQuestionsFromSection(section);
+                    questions.push(...sectionQuestions);
+                } catch (error) {
+                    console.error(`Error extracting from section:`, error);
+                }
+            });
+        });
+        
+        console.log(`📖 Reading order extraction found ${questions.length} questions`);
+        return questions;
+    }
+
+    /**
+     * Extract questions from a reading order section (column or single column)
+     */
+    extractQuestionsFromSection(section) {
+        const questions = [];
+        const { items } = section;
+        
+        if (!items || items.length === 0) {
+            return questions;
+        }
+        
+        // Reconstruct text while preserving layout context
+        const reconstructedText = this.reconstructTextFromItems(items);
+        
+        // Use existing pattern-based extraction on reconstructed text
+        const patternQuestions = this.extractQuestionsWithPatterns(reconstructedText);
+        
+        // Add section metadata to questions
+        patternQuestions.forEach(question => {
+            question.source = `Reading order extraction (${section.type})`;
+            question.sectionInfo = {
+                type: section.type,
+                index: section.index,
+                itemCount: items.length
+            };
+        });
+        
+        return patternQuestions;
+    }
+
+    /**
+     * Reconstruct text from positioned text items preserving layout
+     */
+    reconstructTextFromItems(items) {
+        if (!items || items.length === 0) {
+            return '';
+        }
+        
+        // Group items into lines based on Y position
+        const lines = [];
+        const tolerance = 3;
+        
+        items.forEach(item => {
+            let addedToLine = false;
+            
+            for (let line of lines) {
+                if (Math.abs(line.y - item.y) <= tolerance) {
+                    line.items.push(item);
+                    addedToLine = true;
+                    break;
+                }
+            }
+            
+            if (!addedToLine) {
+                lines.push({
+                    y: item.y,
+                    items: [item]
+                });
+            }
+        });
+        
+        // Sort lines by Y position and items within lines by X position
+        lines.sort((a, b) => a.y - b.y);
+        lines.forEach(line => {
+            line.items.sort((a, b) => a.x - b.x);
+        });
+        
+        // Reconstruct text with appropriate spacing
+        const reconstructedLines = lines.map(line => {
+            let lineText = '';
+            let prevItem = null;
+            
+            line.items.forEach(item => {
+                if (prevItem) {
+                    const gap = item.x - (prevItem.x + prevItem.width);
+                    if (gap > 10) {
+                        lineText += ' '; // Add space for significant gaps
+                    }
+                }
+                lineText += item.text;
+                prevItem = item;
+            });
+            
+            return lineText.trim();
+        });
+        
+        return reconstructedLines.join('\n');
+    }
+
+    // ========================================================================
+    // ENHANCED DETECTION HELPERS
+    // ========================================================================
+
+    /**
+     * Enhanced question start detection with layout context
+     */
+    detectQuestionStart(text, items = null) {
+        if (!text) return null;
+        
+        const patterns = [
+            /^Q(\d+)\.\s*(.+)/i,
+            /^Question\s+(\d+)\s*[:\.]?\s*(.+)/i,
+            /^(\d+)\.\s*(.+)/,
+            /^(\d+)\)\s*(.+)/,
+            /^(\d+):\s*(.+)/
+        ];
+        
+        for (let pattern of patterns) {
+            const match = text.match(pattern);
+            if (match) {
+                const number = parseInt(match[1]);
+                const questionText = match[2].trim();
+                
+                // Validate that this is actually a question
+                if (this.isValidQuestionText(questionText, number)) {
+                    return {
+                        number: number,
+                        text: questionText,
+                        pattern: pattern.toString()
+                    };
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Enhanced option detection in a line
+     */
+    detectOptionInLine(text, items = null) {
+        if (!text) return null;
+        
+        const patterns = [
+            /^([A-D])\)\s*(.+)/,
+            /^\(([A-D])\)\s*(.+)/,
+            /^([A-D])\.\s*(.+)/,
+            /^([a-d])\)\s*(.+)/,
+            /^\(([a-d])\)\s*(.+)/
+        ];
+        
+        for (let pattern of patterns) {
+            const match = text.match(pattern);
+            if (match) {
+                const optionLabel = match[1].toUpperCase();
+                const optionText = match[2].trim();
+                
+                if (this.isValidOptionText(optionText)) {
+                    return {
+                        label: optionLabel,
+                        text: optionText,
+                        pattern: pattern.toString()
+                    };
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Check if a line contains option-like text
+     */
+    isOptionLine(text) {
+        return /^[A-D][\)\.]|^\([A-D]\)|^[a-d][\)\.]|^\([a-d]\)/.test(text.trim());
+    }
+
+    /**
+     * Check if text looks like an option
+     */
+    isOptionLikeText(text) {
+        if (!text || text.length === 0) return false;
+        
+        // Check for option patterns
+        if (this.isOptionLine(text)) return true;
+        
+        // Check if text is short and could be an option
+        if (text.length < 100 && text.length > 2) {
+            // Avoid detecting questions as options
+            if (!this.detectQuestionStart(text)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Validate if text is a proper question
+     */
+    isValidQuestionText(text, number = null) {
+        if (!text || text.length < 5) return false;
+        
+        // Should have reasonable length
+        if (text.length > 500) return false;
+        
+        // Should not be just numbers or single words
+        if (/^\d+$/.test(text) || text.split(/\s+/).length < 3) return false;
+        
+        // Should not be an obvious option
+        if (this.isOptionLine(text)) return false;
+        
+        // Question number should be reasonable
+        if (number !== null && (number < 1 || number > 1000)) return false;
+        
+        return true;
+    }
+
+    /**
+     * Validate if text is a proper option
+     */
+    isValidOptionText(text) {
+        if (!text || text.length === 0) return false;
+        
+        // Remove option labels for validation
+        const cleanText = text.replace(/^[A-D][\)\.]|^\([A-D]\)|^[a-d][\)\.]|^\([a-d]\)/, '').trim();
+        
+        if (cleanText.length < 1) return false;
+        if (cleanText.length > 200) return false;
+        
+        return true;
     }
 
     // Question Bank Management
@@ -7406,6 +7977,572 @@ D) 6</pre>
             
             console.log('✅ Large dataset optimizations applied');
         }
+    }
+
+    // ========================================================================
+    // ENHANCED LAYOUT ANALYSIS AND EXTRACTION METHODS
+    // ========================================================================
+
+    /**
+     * Advanced PDF Layout Analyzer for complex document structures
+     * Detects multi-column layouts, reading order, and text block relationships
+     */
+    async analyzeDocumentLayout(pdf) {
+        console.log('🔍 Analyzing document layout for complex structures...');
+        
+        const layoutAnalysis = {
+            pageLayouts: [],
+            columnDetection: {},
+            readingOrder: [],
+            textBlocks: [],
+            tableRegions: [],
+            imageRegions: []
+        };
+
+        try {
+            const numPages = pdf.numPages;
+            
+            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const pageLayout = await this.analyzePageLayout(page, pageNum);
+                layoutAnalysis.pageLayouts.push(pageLayout);
+                
+                // Detect columns for this page
+                const columnInfo = this.detectColumnLayout(pageLayout.textItems);
+                layoutAnalysis.columnDetection[pageNum] = columnInfo;
+                
+                // Detect table regions
+                const tableRegions = this.detectTableRegions(pageLayout.textItems);
+                layoutAnalysis.tableRegions.push(...tableRegions.map(t => ({...t, pageNum})));
+                
+                // Detect image regions (placeholder detection based on text gaps)
+                const imageRegions = this.detectImageRegions(pageLayout.textItems, page);
+                layoutAnalysis.imageRegions.push(...imageRegions.map(i => ({...i, pageNum})));
+            }
+            
+            // Establish reading order across pages
+            layoutAnalysis.readingOrder = this.establishReadingOrder(layoutAnalysis.pageLayouts);
+            
+            console.log('📊 Layout analysis complete:', {
+                pages: layoutAnalysis.pageLayouts.length,
+                columnsDetected: Object.keys(layoutAnalysis.columnDetection).length,
+                tableRegions: layoutAnalysis.tableRegions.length,
+                imageRegions: layoutAnalysis.imageRegions.length
+            });
+            
+            return layoutAnalysis;
+            
+        } catch (error) {
+            console.error('Layout analysis failed:', error);
+            return layoutAnalysis; // Return partial results
+        }
+    }
+
+    /**
+     * Analyze individual page layout and extract text positioning data
+     */
+    async analyzePageLayout(page, pageNum) {
+        console.log(`📄 Analyzing layout for page ${pageNum}...`);
+        
+        try {
+            // Get text content with positioning information
+            const textContent = await page.getTextContent();
+            const viewport = page.getViewport({ scale: 1.0 });
+            
+            // Process text items with enhanced positioning data
+            const textItems = textContent.items.map((item, index) => {
+                const transform = item.transform;
+                const x = transform[4];
+                const y = viewport.height - transform[5]; // Convert to top-down coordinates
+                const width = item.width || 0;
+                const height = item.height || transform[0] || 12; // Fallback height
+                
+                return {
+                    text: item.str,
+                    x: x,
+                    y: y,
+                    width: width,
+                    height: height,
+                    fontSize: transform[0] || 12,
+                    fontName: item.fontName || 'unknown',
+                    index: index,
+                    transform: transform,
+                    // Calculate text boundaries
+                    left: x,
+                    right: x + width,
+                    top: y,
+                    bottom: y + height,
+                    // Text properties
+                    isNumber: /^\d+[\.\)]/.test(item.str.trim()),
+                    isOption: /^[A-D][\)\.]/.test(item.str.trim()),
+                    isQuestion: /^(Q|Question|\d+[\.\)])/.test(item.str.trim()),
+                    wordCount: item.str.trim().split(/\s+/).length
+                };
+            });
+            
+            // Sort by reading order (top to bottom, left to right)
+            textItems.sort((a, b) => {
+                const yDiff = a.y - b.y;
+                if (Math.abs(yDiff) > 5) return yDiff; // Different lines
+                return a.x - b.x; // Same line, left to right
+            });
+            
+            return {
+                pageNum: pageNum,
+                viewport: viewport,
+                textItems: textItems,
+                bounds: this.calculatePageBounds(textItems),
+                lineGroups: this.groupTextIntoLines(textItems),
+                textDensity: this.calculateTextDensity(textItems, viewport)
+            };
+            
+        } catch (error) {
+            console.error(`Failed to analyze page ${pageNum}:`, error);
+            return {
+                pageNum: pageNum,
+                textItems: [],
+                bounds: null,
+                lineGroups: [],
+                textDensity: 0,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Detect column layout patterns in text items
+     */
+    detectColumnLayout(textItems) {
+        if (!textItems || textItems.length === 0) {
+            return { columns: 1, boundaries: [], confidence: 0 };
+        }
+        
+        // Group text items by approximate Y coordinates (lines)
+        const lines = this.groupTextIntoLines(textItems);
+        
+        // Analyze X-coordinate distribution to detect columns
+        const xPositions = textItems.map(item => item.x);
+        const leftMargins = this.findCommonXPositions(xPositions, 10); // 10px tolerance
+        
+        // Detect column breaks based on consistent left margins
+        let columnCount = 1;
+        let columnBoundaries = [];
+        
+        if (leftMargins.length >= 2) {
+            // Multiple consistent left margins suggest columns
+            columnCount = leftMargins.length;
+            columnBoundaries = leftMargins.map((margin, index) => ({
+                columnIndex: index,
+                leftMargin: margin,
+                rightMargin: index < leftMargins.length - 1 ? leftMargins[index + 1] - 20 : null
+            }));
+        }
+        
+        // Validate column detection by checking text distribution
+        const confidence = this.validateColumnDetection(textItems, columnBoundaries);
+        
+        console.log(`📐 Column detection: ${columnCount} columns with ${confidence}% confidence`);
+        
+        return {
+            columns: columnCount,
+            boundaries: columnBoundaries,
+            confidence: confidence,
+            leftMargins: leftMargins,
+            hasMultipleColumns: columnCount > 1 && confidence > 70
+        };
+    }
+
+    /**
+     * Group text items into logical lines based on Y-coordinates
+     */
+    groupTextIntoLines(textItems) {
+        const lines = [];
+        const tolerance = 3; // pixels
+        
+        textItems.forEach(item => {
+            let addedToLine = false;
+            
+            // Try to add to existing line
+            for (let line of lines) {
+                if (Math.abs(line.y - item.y) <= tolerance) {
+                    line.items.push(item);
+                    line.text += ' ' + item.text;
+                    line.left = Math.min(line.left, item.left);
+                    line.right = Math.max(line.right, item.right);
+                    addedToLine = true;
+                    break;
+                }
+            }
+            
+            // Create new line if not added to existing
+            if (!addedToLine) {
+                lines.push({
+                    y: item.y,
+                    left: item.left,
+                    right: item.right,
+                    height: item.height,
+                    text: item.text,
+                    items: [item]
+                });
+            }
+        });
+        
+        // Sort lines by Y position
+        lines.sort((a, b) => a.y - b.y);
+        
+        return lines;
+    }
+
+    /**
+     * Find common X positions that might indicate column starts
+     */
+    findCommonXPositions(xPositions, tolerance = 10) {
+        const clusters = [];
+        const sortedX = [...xPositions].sort((a, b) => a - b);
+        
+        for (let x of sortedX) {
+            let addedToCluster = false;
+            
+            for (let cluster of clusters) {
+                if (Math.abs(cluster.center - x) <= tolerance) {
+                    cluster.positions.push(x);
+                    cluster.center = cluster.positions.reduce((sum, pos) => sum + pos, 0) / cluster.positions.length;
+                    cluster.count++;
+                    addedToCluster = true;
+                    break;
+                }
+            }
+            
+            if (!addedToCluster) {
+                clusters.push({
+                    center: x,
+                    positions: [x],
+                    count: 1
+                });
+            }
+        }
+        
+        // Return clusters with significant occurrence (at least 3 items)
+        return clusters
+            .filter(cluster => cluster.count >= 3)
+            .map(cluster => Math.round(cluster.center))
+            .sort((a, b) => a - b);
+    }
+
+    /**
+     * Validate column detection by analyzing text distribution
+     */
+    validateColumnDetection(textItems, columnBoundaries) {
+        if (columnBoundaries.length <= 1) return 50;
+        
+        let confidence = 0;
+        let totalItems = textItems.length;
+        
+        // Check if text items are well distributed across detected columns
+        const itemsPerColumn = new Array(columnBoundaries.length).fill(0);
+        
+        textItems.forEach(item => {
+            for (let i = 0; i < columnBoundaries.length; i++) {
+                const boundary = columnBoundaries[i];
+                const nextBoundary = columnBoundaries[i + 1];
+                
+                if (item.x >= boundary.leftMargin && 
+                    (!nextBoundary || item.x < nextBoundary.leftMargin)) {
+                    itemsPerColumn[i]++;
+                    break;
+                }
+            }
+        });
+        
+        // Calculate distribution balance
+        const avgItemsPerColumn = totalItems / columnBoundaries.length;
+        const distributionVariance = itemsPerColumn.reduce((sum, count) => 
+            sum + Math.pow(count - avgItemsPerColumn, 2), 0) / columnBoundaries.length;
+        
+        // Lower variance = higher confidence
+        const maxVariance = avgItemsPerColumn * avgItemsPerColumn;
+        confidence = Math.max(0, 100 - (distributionVariance / maxVariance) * 100);
+        
+        return Math.round(confidence);
+    }
+
+    /**
+     * Detect table regions based on text alignment patterns
+     */
+    detectTableRegions(textItems) {
+        const tableRegions = [];
+        const lines = this.groupTextIntoLines(textItems);
+        
+        // Look for consistent column patterns that suggest tables
+        for (let i = 0; i < lines.length - 2; i++) {
+            const potentialTableLines = [];
+            
+            // Check if next few lines have similar column structure
+            for (let j = i; j < Math.min(i + 10, lines.length); j++) {
+                const line = lines[j];
+                const columns = this.detectLineColumns(line);
+                
+                if (columns.length >= 2) {
+                    potentialTableLines.push({
+                        lineIndex: j,
+                        line: line,
+                        columns: columns
+                    });
+                } else {
+                    break; // Table structure broken
+                }
+            }
+            
+            // If we found at least 3 consistent lines, it's likely a table
+            if (potentialTableLines.length >= 3) {
+                const tableRegion = this.createTableRegion(potentialTableLines);
+                if (tableRegion) {
+                    tableRegions.push(tableRegion);
+                    i += potentialTableLines.length - 1; // Skip processed lines
+                }
+            }
+        }
+        
+        console.log(`📊 Detected ${tableRegions.length} table regions`);
+        return tableRegions;
+    }
+
+    /**
+     * Detect column structure within a single line
+     */
+    detectLineColumns(line) {
+        const items = line.items.sort((a, b) => a.x - b.x);
+        const columns = [];
+        let currentColumn = [];
+        
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const nextItem = items[i + 1];
+            
+            currentColumn.push(item);
+            
+            // Check if there's a significant gap to next item (new column)
+            if (nextItem && (nextItem.x - item.right) > 20) {
+                columns.push({
+                    items: currentColumn,
+                    left: currentColumn[0].x,
+                    right: currentColumn[currentColumn.length - 1].right,
+                    text: currentColumn.map(item => item.text).join(' ')
+                });
+                currentColumn = [];
+            }
+        }
+        
+        // Add last column
+        if (currentColumn.length > 0) {
+            columns.push({
+                items: currentColumn,
+                left: currentColumn[0].x,
+                right: currentColumn[currentColumn.length - 1].right,
+                text: currentColumn.map(item => item.text).join(' ')
+            });
+        }
+        
+        return columns;
+    }
+
+    /**
+     * Create table region object from detected table lines
+     */
+    createTableRegion(tableLines) {
+        if (!tableLines || tableLines.length === 0) return null;
+        
+        const firstLine = tableLines[0].line;
+        const lastLine = tableLines[tableLines.length - 1].line;
+        
+        // Calculate table boundaries
+        const left = Math.min(...tableLines.map(tl => tl.line.left));
+        const right = Math.max(...tableLines.map(tl => tl.line.right));
+        const top = firstLine.y;
+        const bottom = lastLine.y + lastLine.height;
+        
+        // Analyze column structure consistency
+        const columnStructures = tableLines.map(tl => tl.columns);
+        const consistentColumns = this.findConsistentColumns(columnStructures);
+        
+        return {
+            type: 'table',
+            bounds: { left, right, top, bottom },
+            lines: tableLines,
+            columns: consistentColumns,
+            rowCount: tableLines.length,
+            columnCount: consistentColumns.length,
+            confidence: this.calculateTableConfidence(tableLines)
+        };
+    }
+
+    /**
+     * Find consistent column positions across table lines
+     */
+    findConsistentColumns(columnStructures) {
+        if (!columnStructures || columnStructures.length === 0) return [];
+        
+        // Use first line as template
+        const templateColumns = columnStructures[0];
+        const consistentColumns = [];
+        
+        templateColumns.forEach((templateCol, colIndex) => {
+            const columnPositions = columnStructures.map(structure => 
+                structure[colIndex] ? structure[colIndex].left : null
+            ).filter(pos => pos !== null);
+            
+            if (columnPositions.length >= columnStructures.length * 0.7) {
+                // At least 70% of lines have this column
+                const avgLeft = columnPositions.reduce((sum, pos) => sum + pos, 0) / columnPositions.length;
+                consistentColumns.push({
+                    index: colIndex,
+                    left: avgLeft,
+                    consistency: columnPositions.length / columnStructures.length
+                });
+            }
+        });
+        
+        return consistentColumns;
+    }
+
+    /**
+     * Calculate confidence score for table detection
+     */
+    calculateTableConfidence(tableLines) {
+        if (!tableLines || tableLines.length < 3) return 0;
+        
+        let confidence = 50; // Base confidence
+        
+        // Boost confidence based on consistent column count
+        const columnCounts = tableLines.map(tl => tl.columns.length);
+        const avgColumnCount = columnCounts.reduce((sum, count) => sum + count, 0) / columnCounts.length;
+        const columnVariance = columnCounts.reduce((sum, count) => sum + Math.pow(count - avgColumnCount, 2), 0) / columnCounts.length;
+        
+        if (columnVariance < 0.5) confidence += 20; // Very consistent
+        else if (columnVariance < 1) confidence += 10; // Somewhat consistent
+        
+        // Boost for having reasonable number of rows
+        if (tableLines.length >= 5) confidence += 15;
+        if (tableLines.length >= 8) confidence += 10;
+        
+        // Boost for multiple columns
+        if (avgColumnCount >= 3) confidence += 15;
+        if (avgColumnCount >= 4) confidence += 10;
+        
+        return Math.min(100, confidence);
+    }
+
+    /**
+     * Detect potential image regions based on text gaps and layout anomalies
+     */
+    detectImageRegions(textItems, page) {
+        const imageRegions = [];
+        const lines = this.groupTextIntoLines(textItems);
+        
+        // Look for significant vertical gaps that might contain images
+        for (let i = 0; i < lines.length - 1; i++) {
+            const currentLine = lines[i];
+            const nextLine = lines[i + 1];
+            
+            const verticalGap = nextLine.y - (currentLine.y + currentLine.height);
+            
+            // Significant gap might indicate an image
+            if (verticalGap > 50) {
+                // Check if there's text mentioning figures/diagrams nearby
+                const contextText = (currentLine.text + ' ' + nextLine.text).toLowerCase();
+                const hasImageReference = /figure|diagram|chart|graph|image|fig|picture/.test(contextText);
+                
+                const imageRegion = {
+                    type: 'image_placeholder',
+                    bounds: {
+                        left: Math.min(currentLine.left, nextLine.left),
+                        right: Math.max(currentLine.right, nextLine.right),
+                        top: currentLine.y + currentLine.height,
+                        bottom: nextLine.y
+                    },
+                    gap: verticalGap,
+                    hasReference: hasImageReference,
+                    confidence: hasImageReference ? 80 : (verticalGap > 100 ? 60 : 40),
+                    context: {
+                        beforeText: currentLine.text,
+                        afterText: nextLine.text
+                    }
+                };
+                
+                imageRegions.push(imageRegion);
+            }
+        }
+        
+        console.log(`🖼️ Detected ${imageRegions.length} potential image regions`);
+        return imageRegions;
+    }
+
+    /**
+     * Calculate page bounds from text items
+     */
+    calculatePageBounds(textItems) {
+        if (!textItems || textItems.length === 0) return null;
+        
+        return {
+            left: Math.min(...textItems.map(item => item.left)),
+            right: Math.max(...textItems.map(item => item.right)),
+            top: Math.min(...textItems.map(item => item.top)),
+            bottom: Math.max(...textItems.map(item => item.bottom))
+        };
+    }
+
+    /**
+     * Calculate text density for layout analysis
+     */
+    calculateTextDensity(textItems, viewport) {
+        if (!textItems || textItems.length === 0 || !viewport) return 0;
+        
+        const totalTextArea = textItems.reduce((sum, item) => sum + (item.width * item.height), 0);
+        const pageArea = viewport.width * viewport.height;
+        
+        return totalTextArea / pageArea;
+    }
+
+    /**
+     * Establish reading order across all pages
+     */
+    establishReadingOrder(pageLayouts) {
+        const readingOrder = [];
+        
+        pageLayouts.forEach(pageLayout => {
+            const pageOrder = {
+                pageNum: pageLayout.pageNum,
+                sections: []
+            };
+            
+            // For multi-column layouts, establish column reading order
+            if (pageLayout.columnDetection && pageLayout.columnDetection.hasMultipleColumns) {
+                const columns = pageLayout.columnDetection.boundaries;
+                columns.forEach((column, colIndex) => {
+                    const columnItems = pageLayout.textItems.filter(item => 
+                        item.x >= column.leftMargin && 
+                        (!column.rightMargin || item.x < column.rightMargin)
+                    );
+                    
+                    pageOrder.sections.push({
+                        type: 'column',
+                        index: colIndex,
+                        items: columnItems.sort((a, b) => a.y - b.y)
+                    });
+                });
+            } else {
+                // Single column - simple top-to-bottom order
+                pageOrder.sections.push({
+                    type: 'single_column',
+                    index: 0,
+                    items: pageLayout.textItems.sort((a, b) => a.y - b.y)
+                });
+            }
+            
+            readingOrder.push(pageOrder);
+        });
+        
+        return readingOrder;
     }
 
     // ========================================================================
