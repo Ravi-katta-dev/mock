@@ -2845,3 +2845,259 @@ select.form-control {
         gap: 6px;
     }
 }
+
+/* Enhanced Mathematical Expression Support */
+.tex2jax_process {
+    font-family: 'Times New Roman', 'STIX Two Math', serif;
+}
+
+.math-expression {
+    display: inline-block;
+    padding: 2px 4px;
+    background: rgba(59, 130, 246, 0.08);
+    border-radius: 3px;
+    font-family: 'Computer Modern', 'STIX Two Math', 'Times New Roman', serif;
+    font-size: 1.1em;
+}
+
+.math-display {
+    display: block;
+    text-align: center;
+    margin: 16px 0;
+    padding: 12px;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 8px;
+    border-left: 4px solid var(--color-primary);
+}
+
+/* Mathematical symbol styling */
+.math-symbol {
+    font-family: 'STIX Two Math', 'Computer Modern', serif;
+    font-size: 1.1em;
+    color: var(--color-primary);
+}
+
+/* Image Reference Styles */
+.question-images {
+    margin: 16px 0;
+    padding: 12px;
+    background: rgba(245, 158, 11, 0.08);
+    border-radius: 8px;
+    border-left: 4px solid #f59e0b;
+}
+
+.image-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border: 1px dashed #f59e0b;
+}
+
+.image-placeholder:last-child {
+    margin-bottom: 0;
+}
+
+.image-icon {
+    font-size: 1.2em;
+    color: #f59e0b;
+}
+
+.image-text {
+    font-style: italic;
+    color: #8b5cf6;
+    font-weight: 500;
+}
+
+/* Enhanced Answer Key Detection Indicators */
+.answer-key-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: rgba(34, 197, 94, 0.1);
+    color: #059669;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.auto-detected-answer {
+    border-left: 3px solid #059669;
+    background: rgba(34, 197, 94, 0.05);
+}
+
+.needs-review-answer {
+    border-left: 3px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+/* Question Content Enhanced */
+.question-content-enhanced {
+    padding: 20px;
+    background: var(--color-surface);
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    margin-bottom: 16px;
+}
+
+.question-text {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    color: var(--color-text);
+}
+
+/* Math rendering adjustments */
+.MathJax {
+    font-size: 1.1em !important;
+}
+
+.MathJax_Display {
+    margin: 0.8em 0 !important;
+}
+
+/* Complex mathematical expressions */
+.math-complex {
+    background: rgba(99, 102, 241, 0.05);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    margin: 8px 0;
+    display: inline-block;
+}
+
+/* Enhanced processing indicators */
+.processing-indicator {
+    text-align: center;
+    padding: 24px;
+    background: var(--color-surface);
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+}
+
+.processing-indicator .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(59, 130, 246, 0.1);
+    border-top: 4px solid var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.progress-details {
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 8px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 0.9em;
+}
+
+/* Enhanced PDF processing status */
+.pdf-processing-status {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+}
+
+.pdf-processing-status h4 {
+    color: var(--color-primary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Answer confidence indicators */
+.confidence-high {
+    background: rgba(34, 197, 94, 0.1);
+    color: #059669;
+}
+
+.confidence-medium {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+}
+
+.confidence-low {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
+/* Enhanced option styling with math support */
+.option .option-text {
+    font-size: 1.05em;
+    line-height: 1.5;
+}
+
+.option .option-text .math-expression {
+    margin: 0 2px;
+}
+
+/* Image and diagram support indicators */
+.diagram-reference {
+    background: rgba(139, 92, 246, 0.1);
+    color: #7c3aed;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 500;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* Enhanced tooltips for mathematical expressions */
+.math-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.math-tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* Practice set detection indicators */
+.practice-set-detected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.answer-key-detected {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
