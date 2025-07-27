@@ -11,8 +11,12 @@ class MockTestApp {
         this.uploadedPDFs = JSON.parse(localStorage.getItem('uploadedPDFs')) || [];
         this.draftMockTests = JSON.parse(localStorage.getItem('draftMockTests')) || [];
         this.availableMockTests = JSON.parse(localStorage.getItem('availableMockTests')) || [];
+        
+        // Initialize Test Engine
+        this.testEngine = null;
         this.currentTest = null;
-        this.testSession = null;
+        this.testSession = null; // For backward compatibility
+        
         this.charts = {};
         this.currentPDF = null;
         this.pdfDoc = null;
@@ -43,6 +47,48 @@ class MockTestApp {
         
         // Initialize the application
         this.initializeApp();
+        
+        // Initialize Test Engine after app is ready
+        this.initializeTestEngine();
+    }
+
+    /**
+     * Initialize Test Engine with event callbacks
+     */
+    initializeTestEngine() {
+        if (typeof TestEngine === 'undefined') {
+            console.error('TestEngine module not loaded');
+            return;
+        }
+        
+        this.testEngine = new TestEngine(this);
+        
+        // Set up event callbacks for test engine
+        this.testEngine.addEventListener('onQuestionChange', (data) => {
+            this.handleQuestionChange(data);
+        });
+        
+        this.testEngine.addEventListener('onAnswerChange', (data) => {
+            this.handleAnswerChange(data);
+        });
+        
+        this.testEngine.addEventListener('onTimeWarning', (data) => {
+            this.handleTimeWarning(data);
+        });
+        
+        this.testEngine.addEventListener('onAutoSubmit', (data) => {
+            this.handleAutoSubmit(data);
+        });
+        
+        this.testEngine.addEventListener('onSessionSave', (data) => {
+            this.handleSessionSave(data);
+        });
+        
+        this.testEngine.addEventListener('onTestComplete', (data) => {
+            this.handleTestComplete(data);
+        });
+        
+        console.log('Test Engine initialized successfully');
     }
 
     initializeConfiguration() {
@@ -265,6 +311,12 @@ class MockTestApp {
     }
 
     updateProgressIndicators() {
+        // Use TestEngine if available, otherwise fall back to legacy
+        if (this.testEngine && this.testEngine.currentSession) {
+            return this.updateProgressIndicatorsWithEngine();
+        }
+        
+        // Legacy mode
         if (!this.testSession) return;
         
         const totalQuestions = this.testSession.questions.length;
@@ -272,6 +324,45 @@ class MockTestApp {
         const markedCount = this.testSession.markedQuestions.size;
         const remainingCount = totalQuestions - answeredCount;
         const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
+        
+        // Update progress bar
+        const progressFill = document.getElementById('overallProgressFill');
+        const progressText = document.getElementById('overallProgressText');
+        
+        if (progressFill && progressText) {
+            progressFill.style.width = progressPercent + '%';
+            progressFill.classList.add('pulse');
+            setTimeout(() => progressFill.classList.remove('pulse'), 300);
+            progressText.textContent = progressPercent + '%';
+        }
+        
+        // Update stats
+        const answeredEl = document.getElementById('answeredCount');
+        const markedEl = document.getElementById('markedCount');
+        const remainingEl = document.getElementById('remainingCount');
+        
+        if (answeredEl) answeredEl.textContent = answeredCount;
+        if (markedEl) markedEl.textContent = markedCount;
+        if (remainingEl) remainingEl.textContent = remainingCount;
+        
+        // Update palette stats
+        const paletteStats = document.getElementById('paletteStats');
+        if (paletteStats) {
+            paletteStats.textContent = `${answeredCount}/${totalQuestions}`;
+        }
+    }
+
+    /**
+     * Update progress indicators using TestEngine
+     */
+    updateProgressIndicatorsWithEngine() {
+        const sessionStatus = this.testEngine.getSessionStatus();
+        
+        const totalQuestions = sessionStatus.totalQuestions;
+        const answeredCount = sessionStatus.questionsAttempted;
+        const markedCount = sessionStatus.questionsMarked;
+        const remainingCount = totalQuestions - answeredCount;
+        const progressPercent = sessionStatus.progress;
         
         // Update progress bar
         const progressFill = document.getElementById('overallProgressFill');
@@ -459,6 +550,12 @@ class MockTestApp {
     }
 
     updateQuestionPalette() {
+        // Use TestEngine if available, otherwise fall back to legacy
+        if (this.testEngine && this.testEngine.currentSession) {
+            return this.updateQuestionPaletteWithEngine();
+        }
+        
+        // Legacy mode
         if (!this.testSession) return;
         
         const paletteGrid = document.getElementById('questionPalette');
@@ -480,6 +577,32 @@ class MockTestApp {
             
             if (isMarked) className += ' marked';
             if (isFlagged) className += ' flagged';
+            
+            return `
+                <div class="${className}" onclick="app.jumpToQuestion(${index})" title="Question ${index + 1}">
+                    ${index + 1}
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Update question palette using TestEngine
+     */
+    updateQuestionPaletteWithEngine() {
+        const paletteGrid = document.getElementById('questionPalette');
+        if (!paletteGrid) return;
+        
+        const navigationStatus = this.testEngine.getNavigationStatus();
+        
+        paletteGrid.innerHTML = navigationStatus.map((status, index) => {
+            let className = 'palette-question';
+            if (status.isCurrent) className += ' current';
+            else if (status.isAnswered) className += ' answered';
+            else className += ' not-answered';
+            
+            if (status.isMarked) className += ' marked';
+            if (status.isFlagged) className += ' flagged';
             
             return `
                 <div class="${className}" onclick="app.jumpToQuestion(${index})" title="Question ${index + 1}">
@@ -6117,7 +6240,75 @@ D) 6</pre>
         }
 
         console.log('Generated test config:', testConfig);
-        this.generateTest(testConfig);
+        
+        // Use TestEngine to create and manage the test
+        this.createTestWithEngine(testConfig, testType);
+    }
+
+    /**
+     * Create test using the new TestEngine
+     */
+    createTestWithEngine(config, testType) {
+        // Select questions for the test
+        const questionSelection = this.selectQuestionsForTest(config);
+        
+        if (!questionSelection.success) {
+            alert(questionSelection.message);
+            return;
+        }
+        
+        const selectedQuestions = this.shuffleArray(questionSelection.questions);
+        console.log(`Selected ${selectedQuestions.length} questions for test`);
+
+        // Determine test mode and options
+        let testMode = 'mock'; // default
+        let options = {};
+        
+        switch(testType) {
+            case 'practice':
+                testMode = 'practice';
+                options.scoringMode = 'immediate';
+                options.allowReview = true;
+                break;
+            case 'mock':
+            case 'fullMock':
+                testMode = 'mock';
+                options.scoringMode = 'deferred';
+                options.allowReview = false;
+                break;
+            case 'timed':
+                testMode = 'timed';
+                options.scoringMode = 'deferred';
+                options.allowReview = true;
+                break;
+            default:
+                testMode = 'mock';
+        }
+
+        // Create test session using TestEngine
+        const session = this.testEngine.createSession(config, selectedQuestions, {
+            mode: testMode,
+            ...options
+        });
+        
+        if (!session) {
+            alert('Failed to create test session. Please try again.');
+            return;
+        }
+
+        // Set testSession for backward compatibility
+        this.testSession = session;
+        
+        // Switch to test interface
+        this.switchSection('testInterface');
+        
+        // Initialize test interface and start the session
+        setTimeout(() => {
+            this.initializeTestInterface();
+            this.testEngine.startSession();
+        }, 200);
+        
+        return session;
     }
 
     generateAdaptiveFullMockConfig() {
@@ -6953,6 +7144,12 @@ D) 6</pre>
     }
 
     renderQuestion() {
+        // Use TestEngine if available, otherwise fall back to old method
+        if (this.testEngine && this.testEngine.currentSession) {
+            return this.renderQuestionWithEngine();
+        }
+        
+        // Legacy rendering for backward compatibility
         if (!this.testSession || !this.testSession.questions.length) return;
         
         const question = this.testSession.questions[this.testSession.currentQuestion];
@@ -7014,58 +7211,309 @@ D) 6</pre>
             this.renderMathJax(questionOptionsEl);
         }
         
+        this.updateNavigationButtons();
+        this.updateMarkingButtons();
+    }
+
+    /**
+     * Render question using TestEngine
+     */
+    renderQuestionWithEngine() {
+        const currentQuestion = this.testEngine.getCurrentQuestion();
+        if (!currentQuestion) return;
+        
+        const { question, number, totalQuestions, selectedAnswer } = currentQuestion;
+        
+        // Update question text
+        const questionTextEl = document.getElementById('questionText');
+        if (questionTextEl) {
+            const mathRenderedText = question.mathRendered ? 
+                question.text : 
+                this.renderMathematicalExpressions(question.text);
+            questionTextEl.innerHTML = mathRenderedText;
+            
+            // Add image placeholders if present
+            if (question.hasImages) {
+                questionTextEl.innerHTML += this.renderImagePlaceholders(question.imageReferences);
+            }
+            
+            // Trigger MathJax rendering
+            this.renderMathJax(questionTextEl);
+        }
+        
+        // Update progress indicators
+        const elements = {
+            'currentQuestionNum': number,
+            'testProgress': `Question ${number} of ${totalQuestions}`
+        };
+        
+        Object.keys(elements).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = elements[id];
+        });
+        
+        // Render options
+        const optionsHtml = question.options.map((option, index) => {
+            const mathRenderedOption = question.mathRendered ? 
+                option : 
+                this.renderMathematicalExpressions(option);
+            
+            const isSelected = selectedAnswer === index;
+            
+            return `
+                <div class="question-option ${isSelected ? 'selected' : ''}" 
+                     onclick="app.selectOptionWithEngine(${index})">
+                    <input type="radio" name="question_${currentQuestion.index}" 
+                           value="${index}" ${isSelected ? 'checked' : ''}>
+                    <span class="option-label">${String.fromCharCode(65 + index)}.</span>
+                    <span class="option-text tex2jax_process">${mathRenderedOption}</span>
+                    <div class="option-feedback">Selected</div>
+                </div>
+            `;
+        }).join('');
+        
+        const questionOptionsEl = document.getElementById('questionOptions');
+        if (questionOptionsEl) {
+            questionOptionsEl.innerHTML = optionsHtml;
+            this.renderMathJax(questionOptionsEl);
+        }
+        
+        // Show immediate feedback if in practice mode
+        if (this.testEngine.scoringMode === 'immediate' && selectedAnswer !== undefined) {
+            this.showImmediateFeedbackForOption(selectedAnswer, question.correctAnswer);
+        }
+        
+        this.updateNavigationButtons();
+        this.updateMarkingButtons();
+    }
+
+    /**
+     * Update navigation buttons based on current state
+     */
+    updateNavigationButtons() {
+        const currentIndex = this.testEngine ? 
+            this.testEngine.currentQuestionIndex : 
+            (this.testSession ? this.testSession.currentQuestion : 0);
+        const totalQuestions = this.testEngine ? 
+            this.testEngine.questions.length : 
+            (this.testSession ? this.testSession.questions.length : 0);
+            
         // Update navigation buttons
         const prevBtn = document.getElementById('previousQuestion');
         const nextBtn = document.getElementById('nextQuestion');
         
         if (prevBtn) {
-            prevBtn.disabled = this.testSession.currentQuestion === 0;
-            prevBtn.textContent = this.testSession.currentQuestion === 0 ? '← Previous' : '← Previous';
+            prevBtn.disabled = currentIndex === 0;
         }
         
         if (nextBtn) {
-            const isLast = this.testSession.currentQuestion === this.testSession.questions.length - 1;
+            const isLast = currentIndex === totalQuestions - 1;
             nextBtn.disabled = isLast;
-            nextBtn.textContent = isLast ? 'Next →' : 'Next →';
         }
+    }
+
+    /**
+     * Update marking and flagging buttons
+     */
+    updateMarkingButtons() {
+        if (this.testEngine) {
+            const currentQuestion = this.testEngine.getCurrentQuestion();
+            if (!currentQuestion) return;
             
-        // Update mark for review button
-        const markBtn = document.getElementById('markForReview');
-        if (markBtn) {
-            const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
-            const isMarked = this.testSession.markedQuestions.has(questionId);
-            markBtn.textContent = isMarked ? '🏷️ Unmark for Review' : '🏷️ Mark for Review';
-            markBtn.className = `btn ${isMarked ? 'btn--warning' : 'btn--secondary'}`;
-        }
+            // Update mark for review button
+            const markBtn = document.getElementById('markForReview');
+            if (markBtn) {
+                const isMarked = currentQuestion.isMarked;
+                markBtn.textContent = isMarked ? '🏷️ Unmark for Review' : '🏷️ Mark for Review';
+                markBtn.className = `btn ${isMarked ? 'btn--warning' : 'btn--secondary'}`;
+            }
 
-        // Update flag button
-        const flagBtn = document.getElementById('flagQuestion');
-        if (flagBtn) {
-            const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
-            const isFlagged = this.uiState.flaggedQuestions.has(questionId);
-            flagBtn.textContent = isFlagged ? '🚩 Unflag' : '🚩 Flag Difficult';
-            flagBtn.className = `btn ${isFlagged ? 'btn--warning' : 'btn--outline'}`;
-        }
+            // Update flag button
+            const flagBtn = document.getElementById('flagQuestion');
+            if (flagBtn) {
+                const isFlagged = currentQuestion.isFlagged;
+                flagBtn.textContent = isFlagged ? '🚩 Unflag' : '🚩 Flag Difficult';
+                flagBtn.className = `btn ${isFlagged ? 'btn--warning' : 'btn--outline'}`;
+            }
+        } else {
+            // Legacy support
+            const markBtn = document.getElementById('markForReview');
+            if (markBtn && this.testSession) {
+                const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
+                const isMarked = this.testSession.markedQuestions.has(questionId);
+                markBtn.textContent = isMarked ? '🏷️ Unmark for Review' : '🏷️ Mark for Review';
+                markBtn.className = `btn ${isMarked ? 'btn--warning' : 'btn--secondary'}`;
+            }
 
-        // Update confidence selector
-        const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
-        const currentConfidence = this.uiState.confidenceLevels[questionId];
+            const flagBtn = document.getElementById('flagQuestion');
+            if (flagBtn && this.testSession) {
+                const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
+                const isFlagged = this.uiState.flaggedQuestions.has(questionId);
+                flagBtn.textContent = isFlagged ? '🚩 Unflag' : '🚩 Flag Difficult';
+                flagBtn.className = `btn ${isFlagged ? 'btn--warning' : 'btn--outline'}`;
+            }
+        }
+    }
+
+    // ========================================================================
+    // TEST ENGINE EVENT HANDLERS
+    // ========================================================================
+
+    /**
+     * Show immediate feedback for practice mode
+     */
+    showImmediateFeedbackForOption(selectedAnswer, correctAnswer) {
+        const isCorrect = selectedAnswer === correctAnswer;
+        const options = document.querySelectorAll('.question-option');
         
-        document.querySelectorAll('.confidence-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.getAttribute('data-confidence') === currentConfidence) {
-                btn.classList.add('active');
+        options.forEach((option, index) => {
+            option.classList.remove('correct', 'incorrect');
+            
+            if (index === correctAnswer) {
+                option.classList.add('correct');
+            } else if (index === selectedAnswer && !isCorrect) {
+                option.classList.add('incorrect');
             }
         });
+    }
 
-        // Update progress indicators
-        this.updateProgressIndicators();
-        
-        // Update question palette
-        this.updateQuestionPalette();
+    /**
+     * Select option using TestEngine
+     */
+    selectOptionWithEngine(optionIndex) {
+        if (this.testEngine) {
+            this.testEngine.saveAnswer(optionIndex);
+        }
+    }
 
-        // Record question start time for analytics
-        this.testSession.questionStartTime = Date.now();
+    /**
+     * Show time warning in UI
+     */
+    showTimeWarningUI(message) {
+        this.showAutoSaveIndicator('saving');
+        const text = document.getElementById('autoSaveText');
+        if (text) {
+            text.textContent = message.replace(/[⏰⚠️🚨]\s*/, '');
+            setTimeout(() => {
+                this.showAutoSaveIndicator('saved');
+            }, 3000);
+        }
+    }
+
+    /**
+     * Play warning sound if enabled
+     */
+    playWarningSound() {
+        // Could implement audio warning here
+        console.log('Warning sound would play here');
+    }
+
+    /**
+     * Update last saved indicator
+     */
+    updateLastSavedIndicator(timestamp) {
+        this.uiState.lastAutoSave = timestamp;
+    }
+
+    /**
+     * Navigation methods using TestEngine
+     */
+    nextQuestion() {
+        if (this.testEngine) {
+            return this.testEngine.nextQuestion();
+        } else if (this.testSession) {
+            // Legacy navigation
+            return this.navigateToQuestion(this.testSession.currentQuestion + 1);
+        }
+        return false;
+    }
+
+    previousQuestion() {
+        if (this.testEngine) {
+            return this.testEngine.previousQuestion();
+        } else if (this.testSession) {
+            // Legacy navigation
+            return this.navigateToQuestion(this.testSession.currentQuestion - 1);
+        }
+        return false;
+    }
+
+    /**
+     * Mark question for review using TestEngine
+     */
+    markForReview() {
+        if (this.testEngine) {
+            return this.testEngine.markForReview();
+        } else if (this.testSession) {
+            // Legacy marking
+            const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
+            if (this.testSession.markedQuestions.has(questionId)) {
+                this.testSession.markedQuestions.delete(questionId);
+            } else {
+                this.testSession.markedQuestions.add(questionId);
+            }
+            this.updateQuestionPalette();
+            this.updateMarkingButtons();
+        }
+    }
+
+    /**
+     * Flag question using TestEngine
+     */
+    flagQuestion() {
+        if (this.testEngine) {
+            return this.testEngine.flagQuestion();
+        } else if (this.testSession) {
+            // Legacy flagging
+            const questionId = this.testSession.questions[this.testSession.currentQuestion].id;
+            if (this.uiState.flaggedQuestions.has(questionId)) {
+                this.uiState.flaggedQuestions.delete(questionId);
+            } else {
+                this.uiState.flaggedQuestions.add(questionId);
+            }
+            this.updateQuestionPalette();
+            this.updateMarkingButtons();
+        }
+    }
+
+    /**
+     * Clear response using TestEngine
+     */
+    clearResponse() {
+        if (this.testEngine) {
+            return this.testEngine.clearAnswer();
+        } else if (this.testSession) {
+            // Legacy clear
+            this.testSession.answers[this.testSession.currentQuestion] = -1;
+            this.renderQuestion();
+            this.updateQuestionPalette();
+        }
+    }
+
+    /**
+     * Submit test using TestEngine
+     */
+    submitTest() {
+        if (this.testEngine) {
+            const results = this.testEngine.completeSession(false);
+            return results;
+        } else if (this.testSession) {
+            // Legacy submit
+            return this.submitTestLegacy();
+        }
+    }
+
+    /**
+     * Jump to specific question using TestEngine
+     */
+    jumpToQuestion(questionIndex) {
+        if (this.testEngine) {
+            return this.testEngine.navigateToQuestion(questionIndex);
+        } else if (this.testSession) {
+            // Legacy navigation
+            return this.navigateToQuestion(questionIndex);
+        }
+        return false;
     }
 
     selectOption(optionIndex) {
