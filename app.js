@@ -35,11 +35,8 @@ class MockTestApp {
             keyboardShortcutsEnabled: true
         };
         
-        // Initialize syllabus mapping for intelligent chapter detection
-        this.initializeSyllabusMapping();
-        
-        // Initialize exam patterns for intelligent test generation
-        this.initializeExamPatterns();
+        // Initialize configuration from modular files
+        this.initializeConfiguration();
         
         // Initialize enhanced UI features
         this.initializeEnhancedUI();
@@ -48,342 +45,82 @@ class MockTestApp {
         this.initializeApp();
     }
 
-    initializeSyllabusMapping() {
-        // Enhanced RRB Technician Grade-I Signal Syllabus Mapping with comprehensive PYQ patterns
+    initializeConfiguration() {
+        // Initialize configuration from modular files
+        if (typeof window.MockTestConstants !== 'undefined') {
+            this.constants = window.MockTestConstants;
+            console.log('Constants loaded successfully');
+        } else {
+            console.error('Constants module not loaded');
+        }
+
+        if (typeof window.MockTestSyllabus !== 'undefined') {
+            this.syllabusMapping = window.MockTestSyllabus.SYLLABUS_MAPPING;
+            this.syllabusUtils = window.MockTestSyllabus.SyllabusMappingUtils;
+            console.log('Syllabus mapping loaded successfully');
+        } else {
+            console.error('Syllabus mapping module not loaded');
+        }
+
+        if (typeof window.MockTestExamPatterns !== 'undefined') {
+            this.examPatterns = window.MockTestExamPatterns.EXAM_PATTERNS;
+            this.testGenerationConfig = window.MockTestExamPatterns.TEST_GENERATION_CONFIG;
+            this.examPatternUtils = window.MockTestExamPatterns.ExamPatternUtils;
+            console.log('Exam patterns loaded successfully');
+        } else {
+            console.error('Exam patterns module not loaded');
+        }
+
+        // Verify configuration loaded properly
+        if (this.syllabusMapping && this.examPatterns) {
+            console.log('All configuration modules loaded successfully');
+            console.log('Available subjects:', Object.keys(this.syllabusMapping).filter(key => key !== 'global_keywords'));
+            console.log('Available exam patterns:', Object.keys(this.examPatterns));
+        } else {
+            console.warn('Some configuration modules failed to load, using fallback configuration');
+            this.initializeFallbackConfiguration();
+        }
+    }
+
+    initializeFallbackConfiguration() {
+        // Minimal fallback configuration in case modules don't load
+        console.warn('Loading fallback configuration');
+        
         this.syllabusMapping = {
             "General Awareness": {
-                chapters: [
-                    "Current Affairs",
-                    "Indian Geography", 
-                    "Culture and History of India",
-                    "Freedom Struggle",
-                    "Indian Polity and Constitution",
-                    "Indian Economy",
-                    "Environmental Issues",
-                    "India and World",
-                    "Sports",
-                    "General Scientific and Technological Developments"
-                ],
-                keywords: {
-                    "Current Affairs": ["current", "recent", "2024", "2025", "2023", "2022", "news", "events", "government", "minister", "prime minister", "president", "chief minister", "policy", "scheme", "award", "summit", "treaty", "modi", "droupadi murmu", "ram nath kovind", "budget", "union", "state", "governor", "cabinet", "appointment", "resignation", "election", "covid", "vaccination", "mission", "yojana", "startup", "digital", "ranking", "index", "report"],
-                    "Indian Geography": ["geography", "mountain", "river", "state", "capital", "plateau", "desert", "climate", "monsoon", "himalayas", "ganges", "deccan", "western ghats", "eastern ghats", "brahmaputra", "kaveri", "krishna", "narmada", "godavari", "indus", "arabian sea", "bay of bengal", "indian ocean", "thar", "vindhya", "satpura", "nilgiri", "aravalli", "andaman", "nicobar", "lakshadweep", "tropic", "equator", "latitude", "longitude", "delta", "estuary", "peninsula", "island", "strait", "gulf"],
-                    "Culture and History of India": ["culture", "history", "ancient", "medieval", "modern", "mughal", "british", "independence", "freedom fighter", "civilization", "indus valley", "vedic", "gupta", "maurya", "chola", "pandya", "pallava", "vijayanagara", "delhi sultanate", "akbar", "shah jahan", "aurangzeb", "maratha", "shivaji", "rana pratap", "tipu sultan", "harappan", "mohenjo-daro", "harappa", "lothal", "dholavira", "buddhism", "jainism", "hinduism", "sikhism", "christianity", "islam", "temple", "mosque", "church", "gurudwara", "festival", "tradition", "art", "sculpture", "painting", "dance", "music"],
-                    "Freedom Struggle": ["freedom", "independence", "1857", "rebellion", "quit india", "salt march", "non-cooperation", "civil disobedience", "gandhi", "nehru", "subhash", "bhagat singh", "chandrashekhar azad", "lala lajpat rai", "bal gangadhar tilak", "gopal krishna gokhale", "dadabhai naoroji", "sardar patel", "sarojini naidu", "rani laxmi bai", "tatya tope", "mangal pandey", "khudiram bose", "ashfaqullah khan", "ramprasad bismil", "revolutionary", "congress", "muslim league", "partition", "jallianwala bagh", "chauri chaura", "kakori", "simon commission"],
-                    "Indian Polity and Constitution": ["constitution", "fundamental rights", "directive principles", "amendment", "parliament", "lok sabha", "rajya sabha", "president", "governor", "supreme court", "high court", "chief justice", "article", "preamble", "secular", "democratic", "republic", "federal", "unitary", "emergency", "ordinance", "bill", "act", "election commission", "upsc", "cag", "attorney general", "solicitor general", "central", "state", "union territory", "schedule", "list", "concurrent", "residual", "judiciary", "executive", "legislature"],
-                    "Indian Economy": ["economy", "gdp", "budget", "fiscal", "monetary", "reserve bank", "inflation", "currency", "trade", "export", "import", "agriculture", "industry", "service sector", "rbi", "sebi", "nabard", "sidbi", "niti aayog", "planning commission", "five year plan", "poverty", "unemployment", "subsidy", "tax", "gst", "income tax", "corporate tax", "disinvestment", "privatisation", "liberalisation", "globalisation", "devaluation", "balance of payments", "current account", "capital account", "forex", "stock exchange", "sensex", "nifty", "mutual fund", "insurance", "banking", "credit", "loan"],
-                    "Environmental Issues": ["environment", "pollution", "climate change", "global warming", "biodiversity", "conservation", "renewable energy", "sustainable", "ecology", "carbon", "ozone", "greenhouse", "deforestation", "afforestation", "wildlife", "national park", "sanctuary", "biosphere", "ecosystem", "endangered", "extinct", "tiger", "elephant", "rhino", "leopard", "solar", "wind", "hydro", "nuclear", "coal", "petroleum", "natural gas", "waste", "recycling", "plastic", "water", "air", "soil", "noise"],
-                    "India and World": ["international", "united nations", "brics", "saarc", "asean", "g20", "world bank", "imf", "foreign policy", "diplomacy", "bilateral", "multilateral", "nato", "who", "unesco", "unicef", "wto", "security council", "general assembly", "neighbour", "china", "pakistan", "bangladesh", "sri lanka", "nepal", "bhutan", "myanmar", "afghanistan", "usa", "russia", "uk", "france", "germany", "japan", "australia", "canada", "border", "lac", "loc", "trade", "agreement", "treaty", "summit", "visit"],
-                    "Sports": ["sports", "cricket", "football", "hockey", "olympics", "commonwealth", "asian games", "world cup", "tournament", "champion", "medal", "player", "athlete", "virat kohli", "ms dhoni", "rohit sharma", "mary kom", "sania mirza", "pv sindhu", "saina nehwal", "bajrang punia", "vinesh phogat", "neeraj chopra", "mirabai chanu", "lovlina borgohain", "wrestling", "badminton", "tennis", "boxing", "shooting", "archery", "weightlifting", "javelin", "discus", "hammer", "pole vault", "swimming", "athletics", "gymnastics"],
-                    "General Scientific and Technological Developments": ["science", "technology", "research", "innovation", "space", "isro", "nasa", "satellite", "nuclear", "biotechnology", "artificial intelligence", "digital india", "chandrayaan", "mangalyaan", "gaganyaan", "aditya", "pslv", "gslv", "rocket", "mission", "mars", "moon", "venus", "sun", "covid", "vaccine", "vaccine", "genome", "dna", "rna", "gene", "protein", "cell", "virus", "bacteria", "antibiotic", "computer", "internet", "mobile", "smartphone", "app", "software", "hardware", "processor", "memory", "storage", "network", "5g", "4g", "3g", "wifi", "bluetooth"]
-                }
+                chapters: ["Current Affairs", "Geography", "History", "Polity", "Economy"],
+                keywords: {}
             },
             "General Intelligence & Reasoning": {
-                chapters: [
-                    "Analogies",
-                    "Alphabetical and Number Series",
-                    "Coding and Decoding",
-                    "Mathematical Operations",
-                    "Relationships",
-                    "Syllogism",
-                    "Jumbling",
-                    "Venn Diagram",
-                    "Data Interpretation and Sufficiency",
-                    "Conclusions and Decision Making",
-                    "Similarities and Differences",
-                    "Analytical Reasoning",
-                    "Classification",
-                    "Directions",
-                    "Statement Arguments and Assumptions"
-                ],
-                keywords: {
-                    "Analogies": ["analogies", "analogy", "relation", "similar", "likewise", "corresponds", "parallel", "related", "same way", "relationship", "pattern", "connection", "comparison", "equivalent", "proportional", "ratio", "matching", "corresponding"],
-                    "Alphabetical and Number Series": ["series", "sequence", "pattern", "next", "missing", "alphabetical", "number series", "continuation", "progression", "following", "comes next", "arrange", "order", "ascending", "descending", "skip", "alternate", "consecutive", "fibonacci", "arithmetic", "geometric", "complete the series", "find the missing"],
-                    "Coding and Decoding": ["coding", "decoding", "code", "cipher", "encrypted", "decode", "encode", "written as", "represented", "symbol", "letter", "number", "substitution", "shift", "reverse", "mirror", "opposite", "convert", "translate", "meaning", "secret", "hidden"],
-                    "Mathematical Operations": ["mathematical operations", "operation", "calculate", "compute", "arithmetic", "addition", "subtraction", "multiplication", "division", "bodmas", "pemdas", "solve", "equation", "expression", "value", "result", "answer", "sum", "difference", "product", "quotient", "remainder", "simplify"],
-                    "Relationships": ["relationship", "relation", "family", "father", "mother", "son", "daughter", "brother", "sister", "cousin", "uncle", "aunt", "grandfather", "grandmother", "nephew", "niece", "husband", "wife", "in-law", "generation", "blood relation", "family tree", "parent", "child", "sibling"],
-                    "Syllogism": ["syllogism", "conclusion", "statement", "premise", "follows", "logical", "deduction", "inference", "given", "assume", "true", "false", "definitely", "possibly", "probably", "certainly", "all", "some", "no", "none", "every", "either", "neither", "both", "valid", "invalid"],
-                    "Jumbling": ["jumbling", "arrangement", "rearrange", "sequence", "order", "alphabetical order", "meaningful", "word", "sentence", "letters", "position", "first", "last", "correct", "proper", "logical", "chronological", "arrange", "organize", "sort"],
-                    "Venn Diagram": ["venn diagram", "circle", "intersection", "union", "overlap", "diagram", "set", "common", "both", "either", "neither", "only", "exclusive", "inclusive", "region", "area", "inside", "outside", "boundary"],
-                    "Data Interpretation and Sufficiency": ["data interpretation", "sufficiency", "graph", "chart", "table", "sufficient", "insufficient", "data", "information", "given", "required", "enough", "adequate", "bar chart", "pie chart", "line graph", "histogram", "statistics", "percentage", "ratio", "proportion"],
-                    "Conclusions and Decision Making": ["conclusion", "decision", "inference", "deduce", "reasoning", "logical thinking", "assumption", "hypothesis", "fact", "opinion", "evidence", "proof", "support", "contradict", "strengthen", "weaken", "most likely", "best", "worst", "probable", "feasible"],
-                    "Similarities and Differences": ["similar", "difference", "common", "distinct", "alike", "unlike", "same", "different", "compare", "contrast", "feature", "characteristic", "property", "attribute", "quality", "nature", "type", "kind", "category", "group"],
-                    "Analytical Reasoning": ["analytical", "analysis", "reasoning", "logical", "argument", "premise", "cause", "effect", "reason", "because", "therefore", "hence", "thus", "so", "if", "then", "unless", "although", "however", "but", "nevertheless", "moreover", "furthermore"],
-                    "Classification": ["classification", "category", "group", "classify", "odd one out", "different", "exception", "does not belong", "type", "kind", "class", "set", "collection", "family", "species", "genus", "nature", "characteristic", "property"],
-                    "Directions": ["direction", "north", "south", "east", "west", "left", "right", "distance", "movement", "towards", "away", "opposite", "turn", "face", "facing", "front", "back", "behind", "ahead", "clockwise", "anticlockwise", "northeast", "northwest", "southeast", "southwest", "straight", "diagonal"],
-                    "Statement Arguments and Assumptions": ["statement", "argument", "assumption", "premise", "conclusion", "valid", "invalid", "strong", "weak", "support", "against", "favor", "oppose", "agrees", "disagrees", "implicit", "explicit", "given", "follows", "basis", "ground", "reason", "evidence"]
-                }
-            },
-            "Basics of Computers and Applications": {
-                chapters: [
-                    "Computer Architecture",
-                    "Input and Output Devices",
-                    "Storage Devices",
-                    "Networking",
-                    "Operating Systems",
-                    "MS Office Applications",
-                    "Data Representation",
-                    "Internet and Email",
-                    "Computer Viruses",
-                    "Basic Programming Concepts"
-                ],
-                keywords: {
-                    "Computer Architecture": ["architecture", "cpu", "processor", "memory", "ram", "rom", "motherboard", "hardware", "components", "alu", "control unit", "registers", "cache", "bus", "address bus", "data bus", "control bus", "instruction", "fetch", "decode", "execute", "pipeline", "clock", "frequency", "ghz", "mhz", "bit", "byte", "word", "microprocessor"],
-                    "Input and Output Devices": ["input", "output", "keyboard", "mouse", "monitor", "printer", "scanner", "speaker", "microphone", "joystick", "trackball", "touchpad", "touchscreen", "webcam", "digitizer", "plotter", "projector", "headphone", "earphone", "graphics tablet", "barcode reader", "optical mouse", "mechanical mouse", "laser printer", "inkjet printer", "dot matrix", "led", "lcd", "oled"],
-                    "Storage Devices": ["storage", "hard disk", "ssd", "pendrive", "usb", "cd", "dvd", "blu-ray", "memory card", "external storage", "hdd", "solid state", "flash drive", "optical", "magnetic", "floppy", "tape", "cloud storage", "raid", "nas", "san", "primary", "secondary", "volatile", "non-volatile", "capacity", "gb", "tb", "mb", "kb"],
-                    "Networking": ["network", "lan", "wan", "internet", "router", "switch", "hub", "protocol", "tcp/ip", "wifi", "ethernet", "bluetooth", "fiber optic", "coaxial", "twisted pair", "topology", "star", "ring", "bus", "mesh", "tree", "ip address", "subnet", "gateway", "dns", "dhcp", "firewall", "proxy", "vpn", "bandwidth", "latency", "packet"],
-                    "Operating Systems": ["operating system", "windows", "linux", "unix", "dos", "mac os", "android", "ios", "kernel", "shell", "file system", "process", "thread", "scheduling", "memory management", "virtual memory", "paging", "segmentation", "device driver", "interrupt", "system call", "boot", "startup", "shutdown", "multitasking", "multiprocessing", "multiuser", "gui", "cli"],
-                    "MS Office Applications": ["ms office", "word", "excel", "powerpoint", "outlook", "access", "microsoft office", "document", "spreadsheet", "presentation", "email", "database", "formula", "function", "chart", "graph", "table", "pivot", "macro", "template", "format", "font", "paragraph", "header", "footer", "page", "print", "save", "open", "edit", "insert"],
-                    "Data Representation": ["data representation", "binary", "decimal", "hexadecimal", "octal", "ascii", "unicode", "bit", "byte", "nibble", "word", "character", "string", "integer", "float", "double", "boolean", "encoding", "decoding", "compression", "encryption", "parity", "checksum", "error detection", "error correction", "base", "radix", "conversion"],
-                    "Internet and Email": ["internet", "email", "website", "browser", "search engine", "url", "domain", "html", "http", "https", "ftp", "www", "web page", "hyperlink", "bookmark", "download", "upload", "attachment", "inbox", "outbox", "spam", "virus", "phishing", "cookie", "cache", "history", "social media", "chat", "video call", "online", "offline"],
-                    "Computer Viruses": ["virus", "malware", "antivirus", "security", "firewall", "trojan", "worm", "spyware", "adware", "ransomware", "rootkit", "keylogger", "backdoor", "bot", "zombie", "infection", "quarantine", "scan", "update", "patch", "vulnerability", "exploit", "hacker", "cracker", "cybersecurity", "threat", "attack", "defense", "protection"],
-                    "Basic Programming Concepts": ["programming", "algorithm", "flowchart", "variable", "function", "loop", "condition", "if", "else", "while", "for", "array", "string", "input", "output", "syntax", "semantic", "compiler", "interpreter", "debugging", "testing", "code", "software", "application", "program", "language", "c", "java", "python", "basic", "pascal", "fortran"]
-                }
+                chapters: ["Analogies", "Series", "Coding", "Logic"],
+                keywords: {}
             },
             "Mathematics": {
-                chapters: [
-                    "Number System",
-                    "Rational and Irrational Numbers",
-                    "BODMAS Rule",
-                    "Quadratic Equations",
-                    "Arithmetic Progression",
-                    "Similar Triangles",
-                    "Pythagoras Theorem",
-                    "Co-ordinate Geometry",
-                    "Trigonometric Ratios",
-                    "Heights and Distances",
-                    "Surface Area and Volume",
-                    "Sets and Set Operations",
-                    "Venn Diagrams",
-                    "Union and Intersection of Sets",
-                    "Difference of Sets",
-                    "Complement of Sets",
-                    "Properties of Complement",
-                    "Statistics and Probability",
-                    "Measures of Dispersion",
-                    "Mean Deviation",
-                    "Variance and Standard Deviation",
-                    "Probability of Events",
-                    "Exhaustive Events",
-                    "Mutually Exclusive Events"
-                ],
-                keywords: {
-                    "Number System": ["number system", "natural", "whole", "integer", "rational", "real", "prime", "composite", "even", "odd", "positive", "negative", "hcf", "lcm", "gcd", "factors", "multiples", "divisibility", "remainder", "quotient", "digit", "place value", "face value", "successor", "predecessor", "ascending", "descending"],
-                    "Rational and Irrational Numbers": ["rational", "irrational", "fraction", "decimal", "recurring", "terminating", "non-terminating", "repeating", "non-repeating", "surd", "square root", "cube root", "radical", "p/q", "denominator", "numerator", "improper", "proper", "mixed", "equivalent"],
-                    "BODMAS Rule": ["bodmas", "brackets", "order", "division", "multiplication", "addition", "subtraction", "pemdas", "solve", "simplify", "expression", "parentheses", "exponent", "power", "operation", "precedence", "sequence", "step"],
-                    "Quadratic Equations": ["quadratic", "equation", "roots", "discriminant", "factorization", "quadratic formula", "ax²+bx+c", "parabola", "vertex", "axis", "symmetry", "maximum", "minimum", "nature of roots", "sum of roots", "product of roots", "completing square", "graph"],
-                    "Arithmetic Progression": ["arithmetic progression", "ap", "common difference", "nth term", "sum", "first term", "last term", "sequence", "series", "arithmetic mean", "median", "geometric progression", "gp", "common ratio", "harmonic progression", "hp"],
-                    "Similar Triangles": ["similar triangles", "similarity", "proportion", "corresponding sides", "corresponding angles", "aa", "sas", "sss", "congruent", "scale factor", "ratio", "equal angles", "proportional sides", "basic proportionality", "thales theorem"],
-                    "Pythagoras Theorem": ["pythagoras", "right triangle", "hypotenuse", "right angle", "perpendicular", "base", "height", "90 degree", "square", "a²+b²=c²", "triplet", "pythagorean", "converse", "altitude", "median"],
-                    "Co-ordinate Geometry": ["coordinate", "geometry", "cartesian", "axis", "quadrant", "origin", "abscissa", "ordinate", "distance", "midpoint", "section formula", "area of triangle", "collinear", "slope", "gradient", "intercept", "x-axis", "y-axis", "positive", "negative"],
-                    "Trigonometric Ratios": ["trigonometry", "sin", "cos", "tan", "sine", "cosine", "tangent", "cot", "sec", "cosec", "angle", "ratio", "opposite", "adjacent", "hypotenuse", "identity", "complementary", "supplementary", "0°", "30°", "45°", "60°", "90°", "standard angles"],
-                    "Heights and Distances": ["height", "distance", "angle of elevation", "angle of depression", "horizontal", "vertical", "tower", "building", "ladder", "observer", "line of sight", "trigonometry", "tangent", "sine", "cosine", "shadow", "pole", "tree", "cliff"],
-                    "Surface Area and Volume": ["surface area", "volume", "cube", "cylinder", "sphere", "cone", "cuboid", "prism", "pyramid", "hemisphere", "curved surface", "total surface", "lateral surface", "capacity", "hollow", "solid", "radius", "diameter", "length", "breadth", "height", "slant height"],
-                    "Sets and Set Operations": ["set", "subset", "superset", "element", "member", "belongs", "does not belong", "null set", "empty set", "universal set", "finite", "infinite", "cardinal number", "equal sets", "equivalent sets", "disjoint sets", "overlapping sets"],
-                    "Venn Diagrams": ["venn diagram", "intersection", "union", "complement", "universal set", "circle", "region", "shaded", "unshaded", "inside", "outside", "overlap", "common", "exclusive", "inclusive"],
-                    "Union and Intersection of Sets": ["union", "intersection", "A∪B", "A∩B", "common elements", "all elements", "either", "both", "or", "and", "combining", "overlapping", "separate", "together"],
-                    "Difference of Sets": ["difference", "A-B", "B-A", "minus", "exclude", "except", "not in", "belongs to A but not B", "relative complement", "symmetric difference"],
-                    "Complement of Sets": ["complement", "A'", "Ac", "universal set", "not in A", "outside", "everything except", "opposite", "reverse"],
-                    "Properties of Complement": ["properties", "complement", "law", "de morgan", "distributive", "associative", "commutative", "identity", "involution", "rule"],
-                    "Statistics and Probability": ["statistics", "data", "frequency", "mean", "median", "mode", "average", "central tendency", "raw data", "grouped data", "class", "interval", "tally", "histogram", "frequency distribution"],
-                    "Measures of Dispersion": ["dispersion", "range", "variance", "standard deviation", "spread", "deviation", "scatter", "variability", "quartile", "percentile", "coefficient"],
-                    "Mean Deviation": ["mean deviation", "average deviation", "absolute deviation", "deviation from mean", "deviation from median", "md"],
-                    "Variance and Standard Deviation": ["variance", "standard deviation", "σ", "σ²", "population", "sample", "spread", "root mean square"],
-                    "Probability of Events": ["probability", "event", "outcome", "sample space", "favorable", "unfavorable", "certain", "impossible", "likely", "unlikely", "chance", "random", "experiment", "trial"],
-                    "Exhaustive Events": ["exhaustive", "complete", "all possible", "total", "sum equals 1", "covers all", "collectively"],
-                    "Mutually Exclusive Events": ["mutually exclusive", "disjoint", "cannot occur together", "independent", "intersection is null", "either or", "not both"]
-                }
-            },
-            "Basic Science & Engineering": {
-                chapters: [
-                    "Physics Fundamentals",
-                    "Units and Measurements", 
-                    "Mass Weight and Density",
-                    "Work Power and Energy",
-                    "Speed and Velocity",
-                    "Heat and Temperature",
-                    "Electricity and Magnetism",
-                    "Electric Charge and Field",
-                    "Electric Potential",
-                    "Simple Electric Circuits",
-                    "Conductors and Non-conductors",
-                    "Ohm's Law and Limitations",
-                    "Resistances in Series and Parallel",
-                    "Relation between Electric Potential and Voltage",
-                    "Ampere's Law",
-                    "Magnetic Force on Moving Charged Particle",
-                    "Long Straight Conductors",
-                    "Electromagnetic Induction",
-                    "Faraday's Law",
-                    "Electromagnetic Flux",
-                    "Magnetic Field and Induction",
-                    "Electronics and Measurements",
-                    "Basic Electronics",
-                    "Digital Electronics",
-                    "Electronic Devices and Circuits",
-                    "Microcontroller and Microprocessor",
-                    "Electronic Measurements",
-                    "Measuring Systems and Principles",
-                    "Range Extension Methods",
-                    "Cathode Ray Oscilloscope",
-                    "LCD and LED Panel",
-                    "Electronic Transducers"
-                ],
-                keywords: {
-                    "Physics Fundamentals": ["physics", "fundamental", "basic", "principle", "law", "motion", "force", "newton", "mass", "acceleration", "gravity", "friction", "momentum", "impulse", "energy conservation", "mechanical", "thermal", "kinetic", "potential"],
-                    "Units and Measurements": ["unit", "measurement", "si", "metric", "scale", "dimension", "meter", "kilogram", "second", "ampere", "kelvin", "mole", "candela", "length", "time", "area", "volume", "accuracy", "precision", "error", "least count", "vernier", "screw gauge", "caliper"],
-                    "Mass Weight and Density": ["mass", "weight", "density", "kilogram", "gram", "volume", "specific gravity", "relative density", "buoyancy", "archimedes", "floating", "sinking", "displacement", "upthrust", "kg/m³", "g/cm³"],
-                    "Work Power and Energy": ["work", "power", "energy", "kinetic", "potential", "joule", "watt", "mechanical", "conservation", "transformation", "efficiency", "machine", "lever", "pulley", "inclined plane", "wedge", "screw", "wheel and axle", "force", "displacement", "time"],
-                    "Speed and Velocity": ["speed", "velocity", "acceleration", "motion", "displacement", "distance", "time", "uniform", "non-uniform", "average", "instantaneous", "relative", "graphs", "v-t", "s-t", "equations of motion", "free fall"],
-                    "Heat and Temperature": ["heat", "temperature", "thermal", "celsius", "fahrenheit", "kelvin", "thermometer", "expansion", "conduction", "convection", "radiation", "specific heat", "latent heat", "melting", "boiling", "evaporation", "condensation", "calorimeter", "calorimetry"],
-                    "Electricity and Magnetism": ["electricity", "magnetism", "electric", "magnetic", "current", "voltage", "resistance", "power", "energy", "charge", "field", "force", "attraction", "repulsion", "north pole", "south pole", "compass", "electromagnet"],
-                    "Electric Charge and Field": ["charge", "electric field", "coulomb", "positive", "negative", "electron", "proton", "ion", "electrostatic", "force", "attraction", "repulsion", "field lines", "intensity", "potential difference", "work done"],
-                    "Electric Potential": ["potential", "voltage", "volt", "potential difference", "electric field", "work", "charge", "equipotential", "surface", "earth", "ground", "reference", "absolute", "relative"],
-                    "Simple Electric Circuits": ["circuit", "series", "parallel", "resistor", "capacitor", "inductor", "battery", "cell", "switch", "ammeter", "voltmeter", "galvanometer", "rheostat", "potentiometer", "emf", "terminal voltage", "internal resistance"],
-                    "Conductors and Non-conductors": ["conductor", "insulator", "non-conductor", "resistance", "resistivity", "conductivity", "copper", "aluminum", "silver", "gold", "carbon", "rubber", "plastic", "glass", "wood", "air", "free electrons", "bound electrons"],
-                    "Ohm's Law and Limitations": ["ohm", "ohm's law", "resistance", "current", "voltage", "V=IR", "proportional", "linear", "non-linear", "temperature", "limitations", "constant", "variable", "semiconductor", "diode"],
-                    "Resistances in Series and Parallel": ["resistance", "series", "parallel", "equivalent", "total", "combination", "current division", "voltage division", "same current", "same voltage", "addition", "reciprocal"],
-                    "Relation between Electric Potential and Voltage": ["potential", "voltage", "relation", "difference", "electric field", "work", "charge", "gradient", "equipotential", "reference point"],
-                    "Ampere's Law": ["ampere", "ampere's law", "magnetic field", "current", "circular", "loop", "solenoid", "toroid", "flux", "line integral", "right hand rule"],
-                    "Magnetic Force on Moving Charged Particle": ["magnetic force", "charged particle", "motion", "lorentz force", "velocity", "magnetic field", "perpendicular", "circular path", "radius", "cyclotron", "deflection"],
-                    "Long Straight Conductors": ["conductor", "straight", "magnetic field", "biot-savart", "right hand rule", "concentric circles", "distance", "current", "wire", "cable"],
-                    "Electromagnetic Induction": ["electromagnetic", "induction", "induced", "emf", "current", "flux", "change", "faraday", "lenz", "eddy current", "transformer", "generator", "motor"],
-                    "Faraday's Law": ["faraday", "faraday's law", "electromagnetic induction", "flux", "emf", "rate of change", "coil", "turns", "linking", "magnetic field"],
-                    "Electromagnetic Flux": ["flux", "electromagnetic", "magnetic flux", "weber", "field lines", "area", "angle", "perpendicular", "parallel", "surface", "total flux"],
-                    "Magnetic Field and Induction": ["magnetic field", "induction", "induced current", "self induction", "mutual induction", "inductance", "henry", "solenoid", "coil", "core", "air core", "iron core"],
-                    "Electronics and Measurements": ["electronics", "measurement", "electronic", "instruments", "meters", "digital", "analog", "accuracy", "precision", "calibration", "range", "sensitivity"],
-                    "Basic Electronics": ["electronics", "diode", "transistor", "semiconductor", "p-type", "n-type", "junction", "forward bias", "reverse bias", "rectifier", "amplifier", "oscillator", "filter", "regulator", "silicon", "germanium"],
-                    "Digital Electronics": ["digital", "binary", "logic gate", "flip flop", "counter", "register", "decoder", "encoder", "multiplexer", "demultiplexer", "and", "or", "not", "nand", "nor", "xor", "truth table", "boolean algebra"],
-                    "Electronic Devices and Circuits": ["electronic device", "circuit", "amplifier", "operational amplifier", "op-amp", "feedback", "gain", "input", "output", "impedance", "frequency response", "bandwidth", "distortion"],
-                    "Microcontroller and Microprocessor": ["microcontroller", "microprocessor", "embedded", "cpu", "memory", "rom", "ram", "input/output", "port", "pin", "programming", "assembly", "c language", "interrupt", "timer"],
-                    "Electronic Measurements": ["electronic measurement", "multimeter", "oscilloscope", "function generator", "power supply", "dc", "ac", "rms", "peak", "frequency", "period", "phase", "waveform"],
-                    "Measuring Systems and Principles": ["measuring system", "principle", "accuracy", "precision", "resolution", "linearity", "hysteresis", "drift", "noise", "interference", "shielding", "grounding"],
-                    "Range Extension Methods": ["range extension", "method", "scale", "multiplier", "shunt", "transformer", "attenuator", "amplifier", "current transformer", "potential transformer", "burden"],
-                    "Cathode Ray Oscilloscope": ["cathode ray", "oscilloscope", "cro", "waveform", "time base", "vertical", "horizontal", "trigger", "sweep", "trace", "phosphor", "screen", "electron beam"],
-                    "LCD and LED Panel": ["lcd", "led", "display", "panel", "liquid crystal", "light emitting diode", "seven segment", "dot matrix", "backlight", "contrast", "brightness", "pixel", "resolution"],
-                    "Electronic Transducers": ["transducer", "sensor", "convert", "input", "output", "temperature", "pressure", "displacement", "force", "strain", "light", "sound", "active", "passive", "linear", "non-linear"]
-                }
-            },
-            "Mixed/Practice Books": {
-                chapters: [
-                    "General Practice",
-                    "Previous Year Questions",
-                    "Mock Test Questions", 
-                    "Combined Practice",
-                    "Subject-wise Practice",
-                    "Topic-wise Practice",
-                    "Difficulty-wise Practice"
-                ],
-                keywords: {
-                    "General Practice": ["practice", "general", "mixed", "various", "different", "multiple", "comprehensive", "all", "complete", "full", "total", "overall", "entire", "whole", "broad", "wide", "diverse", "assorted", "varied"],
-                    "Previous Year Questions": ["previous year", "pyq", "past", "exam", "2023", "2022", "2021", "2020", "2019", "2018", "2017", "2016", "2015", "old", "earlier", "before", "solved", "solution", "answer key", "explanation", "analysis", "trend", "pattern"],
-                    "Mock Test Questions": ["mock test", "mock", "test", "simulation", "practice test", "sample", "model", "trial", "dummy", "fake", "rehearsal", "preparation", "training", "exercise", "drill", "warm-up"],
-                    "Combined Practice": ["combined", "all subjects", "comprehensive", "complete", "integrated", "unified", "merged", "together", "collective", "joint", "mixed subjects", "multi-subject", "cross-subject", "inter-disciplinary"],
-                    "Subject-wise Practice": ["subject wise", "mathematics", "reasoning", "awareness", "science", "computer", "maths", "math", "gk", "ga", "general knowledge", "logical", "analytical", "technical", "non-technical", "aptitude"],
-                    "Topic-wise Practice": ["topic wise", "chapter wise", "specific topic", "particular", "individual", "separate", "distinct", "focused", "targeted", "specialized", "dedicated", "exclusive", "concentrated"],
-                    "Difficulty-wise Practice": ["difficulty", "easy", "medium", "hard", "level", "beginner", "intermediate", "advanced", "simple", "moderate", "complex", "challenging", "tough", "basic", "standard", "high"]
-                }
+                chapters: ["Arithmetic", "Algebra", "Geometry"],
+                keywords: {}
             }
         };
-        
-        // Add specialized PYQ patterns and common question indicators for better detection
-        this.questionPatterns = {
-            // Common question starters
-            starters: [
-                "which of the following", "what is", "who is", "where is", "when was", "how many", "how much",
-                "if", "find", "calculate", "solve", "determine", "identify", "choose", "select", "pick",
-                "the value of", "the result of", "the answer is", "the correct option", "most appropriate",
-                "best describes", "according to", "as per", "in accordance with", "based on"
-            ],
-            
-            // Question formats commonly found in RRB
-            formats: [
-                "choose the correct answer", "select the right option", "mark the correct", "tick the appropriate",
-                "which one is correct", "which statement is true", "which is false", "odd one out",
-                "complete the series", "find the missing", "next in sequence", "arrange in order",
-                "arrange the following", "match the following", "assertion and reason", "statement and conclusion"
-            ],
-            
-            // RRB specific terminology
-            rrb_terms: [
-                "rrb", "railway", "technician", "loco pilot", "assistant loco pilot", "group d", "ntpc",
-                "je", "junior engineer", "sse", "senior section engineer", "station master", "goods guard",
-                "track maintainer", "helper", "pointsman", "signal", "signalling", "telecommunication",
-                "electrical", "mechanical", "civil", "electronic", "computer", "railway recruitment board"
-            ],
-            
-            // Enhanced mathematical expressions and symbols including Unicode and LaTeX
-            math_expressions: [
-                // Basic operators
-                "=", "+", "-", "×", "÷", "*", "/", "√", "²", "³", "°", "%", "∞",
-                // Comparison operators
-                "≤", "≥", "≠", "≈", "∝", "<", ">", "≡", "≅", "≪", "≫",
-                // Geometry symbols
-                "∠", "△", "□", "○", "∆", "∇", "⊥", "∥", "∦", "∵", "∴",
-                // Functions
-                "sin", "cos", "tan", "cot", "sec", "cosec", "log", "ln", "exp",
-                // Advanced math
-                "∑", "∏", "∫", "∂", "∇", "∈", "∉", "⊂", "⊃", "∪", "∩",
-                // Fractions and powers
-                "½", "⅓", "¼", "¾", "⅛", "⅜", "⅝", "⅞", "ⁿ", "₁", "₂", "₃",
-                // Greek letters
-                "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "λ", "μ", "π", "ρ", "σ", "φ", "ψ", "ω",
-                "Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Λ", "Μ", "Π", "Ρ", "Σ", "Φ", "Ψ", "Ω",
-                // LaTeX patterns
-                "\\frac", "\\sqrt", "\\sum", "\\int", "\\lim", "\\sin", "\\cos", "\\tan",
-                "\\alpha", "\\beta", "\\gamma", "\\delta", "\\pi", "\\theta", "\\omega"
-            ]
-        };
-    }
 
-    // Initialize CBT exam pattern framework for intelligent test generation
-    initializeExamPatterns() {
         this.examPatterns = {
-            'CBT_Technician_GrI_Signal': {
-                name: 'RRB Technician Grade-I Signal CBT',
+            'CBT_Standard': {
+                name: 'Standard CBT Test',
                 totalQuestions: 100,
-                timeLimit: 90, // minutes
+                timeLimit: 90,
                 subjects: {
-                    'General Awareness': { questions: 10, weight: 0.10 },
-                    'General Intelligence & Reasoning': { questions: 15, weight: 0.15 },
-                    'Basics of Computers and Applications': { questions: 20, weight: 0.20 },
-                    'Mathematics': { questions: 20, weight: 0.20 },
-                    'Basic Science & Engineering': { questions: 35, weight: 0.35 }
+                    'General Awareness': { questions: 25, weight: 0.25 },
+                    'General Intelligence & Reasoning': { questions: 25, weight: 0.25 },
+                    'Mathematics': { questions: 50, weight: 0.50 }
                 },
-                difficultyDistribution: {
-                    'Easy': 0.40,    // 40% easy questions
-                    'Medium': 0.45,  // 45% medium questions
-                    'Hard': 0.15     // 15% hard questions
-                },
-                negativeMark: 0.33, // 1/3 negative marking
-                passingPercentage: 40
-            },
-            'SubjectWise_Standard': {
-                name: 'Subject-wise Practice Test',
-                totalQuestions: 25,
-                timeLimit: 22.5, // 54 seconds per question
                 difficultyDistribution: {
                     'Easy': 0.40,
                     'Medium': 0.45,
                     'Hard': 0.15
-                },
-                requireAllChapters: true // Ensure all chapters are covered
-            },
-            'ChapterWise_Standard': {
-                name: 'Chapter-wise Practice Test',
-                totalQuestions: 20,
-                timeLimit: 18, // 54 seconds per question
-                difficultyDistribution: {
-                    'Easy': 0.40,
-                    'Medium': 0.45,
-                    'Hard': 0.15
-                },
-                useDifficultyMix: true
+                }
             }
         };
         
-        console.log('Exam patterns initialized:', Object.keys(this.examPatterns));
+        console.log('Fallback configuration loaded');
     }
-
     initializeEnhancedUI() {
         // Initialize theme
         this.applyTheme(this.uiState.theme);
