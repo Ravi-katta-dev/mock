@@ -529,6 +529,20 @@
         </div>
     </div>
 
+    <!-- PDF Mock Test Preview Modal -->
+    <div id="mockTestPreviewModal" class="modal hidden">
+        <div class="modal-content modal-extra-large">
+            <h2>🎯 Mock Test Preview</h2>
+            <div id="mockTestPreviewContainer">
+                <!-- Mock test preview will be shown here -->
+            </div>
+            <div class="modal-actions">
+                <button id="acceptMockTest" class="btn btn--primary">✅ Accept & Add to Dashboard</button>
+                <button id="cancelMockTest" class="btn btn--secondary">❌ Cancel & Discard</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Initialize PDF.js worker
         if (typeof pdfjsLib !== 'undefined') {
