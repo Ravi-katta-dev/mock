@@ -168,6 +168,9 @@ class MockTestApp {
         // Setup performance monitoring
         this.setupPerformanceMonitoring();
         
+        // Initialize the dashboard view
+        this.initializeDefaultView();
+        
         console.log('✅ Application setup complete');
     }
 
@@ -186,6 +189,202 @@ class MockTestApp {
         window.addEventListener('beforeunload', () => {
             this.saveApplicationState();
         });
+
+        // Setup navigation event handlers
+        this.setupNavigationHandlers();
+    }
+
+    /**
+     * Setup navigation event handlers for section switching
+     */
+    setupNavigationHandlers() {
+        // Handle navigation link clicks
+        document.addEventListener('click', (event) => {
+            const navLink = event.target.closest('[data-section]');
+            if (navLink) {
+                event.preventDefault();
+                const sectionName = navLink.getAttribute('data-section');
+                this.switchSection(sectionName);
+            }
+        });
+
+        // Handle action card clicks (dashboard quick actions)
+        document.addEventListener('click', (event) => {
+            const actionCard = event.target.closest('[data-action]');
+            if (actionCard) {
+                const action = actionCard.getAttribute('data-action');
+                this.handleQuickAction(action);
+            }
+        });
+    }
+
+    /**
+     * Switch between application sections
+     * @param {string} sectionName - Name of the section to switch to
+     */
+    switchSection(sectionName) {
+        try {
+            console.log(`Switching to section: ${sectionName}`);
+            
+            // Hide all sections
+            const allSections = document.querySelectorAll('.content-section');
+            allSections.forEach(section => {
+                section.classList.remove('active');
+            });
+
+            // Show target section
+            const targetSection = document.getElementById(sectionName);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            } else {
+                console.warn(`Section ${sectionName} not found`);
+                return;
+            }
+
+            // Update navigation active state
+            const allNavLinks = document.querySelectorAll('[data-section]');
+            allNavLinks.forEach(link => {
+                link.classList.remove('active');
+            });
+
+            const activeNavLink = document.querySelector(`[data-section="${sectionName}"]`);
+            if (activeNavLink) {
+                activeNavLink.classList.add('active');
+            }
+
+            // Update UI state
+            this.uiState.currentSection = sectionName;
+            this.saveApplicationState();
+
+            // Notify modules of section change
+            this.notifyModulesOfSectionChange(sectionName);
+
+            console.log(`✅ Switched to section: ${sectionName}`);
+        } catch (error) {
+            console.error('Failed to switch section:', error);
+        }
+    }
+
+    /**
+     * Handle quick action clicks from dashboard
+     * @param {string} action - Action name
+     */
+    handleQuickAction(action) {
+        console.log(`Handling quick action: ${action}`);
+        
+        switch (action) {
+            case 'fullMockTest':
+                this.startFullMockTest();
+                break;
+            case 'customTest':
+                this.switchSection('testSelection');
+                break;
+            case 'pyqTest':
+                this.startPYQTest();
+                break;
+            default:
+                console.warn(`Unknown action: ${action}`);
+        }
+    }
+
+    /**
+     * Start full mock test
+     */
+    startFullMockTest() {
+        if (this.modules.testEngine && this.modules.testEngine.startTest) {
+            this.modules.testEngine.startTest({
+                type: 'fullMock',
+                questionCount: 100,
+                duration: 90
+            });
+        } else {
+            console.warn('TestEngine module not available');
+        }
+    }
+
+    /**
+     * Start PYQ test
+     */
+    startPYQTest() {
+        if (this.modules.testEngine && this.modules.testEngine.startTest) {
+            this.modules.testEngine.startTest({
+                type: 'pyq',
+                filterPYQ: true
+            });
+        } else {
+            console.warn('TestEngine module not available');
+        }
+    }
+
+    /**
+     * Notify modules when section changes
+     * @param {string} sectionName - New section name
+     */
+    notifyModulesOfSectionChange(sectionName) {
+        // Notify UI Manager
+        if (this.modules.uiManager && this.modules.uiManager.onSectionChange) {
+            this.modules.uiManager.onSectionChange(sectionName);
+        }
+
+        // Notify specific modules based on section
+        switch (sectionName) {
+            case 'questionBank':
+                if (this.modules.questionBank && this.modules.questionBank.refresh) {
+                    this.modules.questionBank.refresh();
+                }
+                break;
+            case 'analytics':
+                if (this.modules.resultsAnalyzer && this.modules.resultsAnalyzer.refreshCharts) {
+                    this.modules.resultsAnalyzer.refreshCharts();
+                }
+                break;
+            case 'dashboard':
+                this.refreshDashboard();
+                break;
+        }
+    }
+
+    /**
+     * Refresh dashboard data
+     */
+    refreshDashboard() {
+        try {
+            // Update statistics
+            if (this.modules.resultsAnalyzer) {
+                const stats = this.modules.resultsAnalyzer.getOverallStats();
+                this.updateDashboardStats(stats);
+            }
+        } catch (error) {
+            console.error('Failed to refresh dashboard:', error);
+        }
+    }
+
+    /**
+     * Update dashboard statistics
+     * @param {Object} stats - Statistics object
+     */
+    updateDashboardStats(stats = {}) {
+        const elements = {
+            totalTests: document.getElementById('totalTests'),
+            averageScore: document.getElementById('averageScore'),
+            bestScore: document.getElementById('bestScore'),
+            totalQuestions: document.getElementById('totalQuestions')
+        };
+
+        if (elements.totalTests) {
+            elements.totalTests.textContent = stats.totalTests || '0';
+        }
+        if (elements.averageScore) {
+            elements.averageScore.textContent = stats.averageScore ? `${stats.averageScore}%` : '0%';
+        }
+        if (elements.bestScore) {
+            elements.bestScore.textContent = stats.bestScore ? `${stats.bestScore}%` : '0%';
+        }
+        if (elements.totalQuestions) {
+            const questionCount = this.modules.questionManager ? 
+                this.modules.questionManager.getTotalQuestionCount() : 0;
+            elements.totalQuestions.textContent = questionCount.toString();
+        }
     }
 
     /**
@@ -289,6 +488,17 @@ class MockTestApp {
             moduleLoadTimes: Object.fromEntries(this.performance.moduleLoadTimes),
             memoryUsage: 'memory' in performance ? performance.memory : null
         };
+    }
+
+    /**
+     * Initialize the default view (dashboard)
+     */
+    initializeDefaultView() {
+        // Make sure dashboard is visible by default
+        this.switchSection('dashboard');
+        
+        // Initialize dashboard data
+        this.refreshDashboard();
     }
 
     /**

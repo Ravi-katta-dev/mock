@@ -520,6 +520,14 @@ class QuestionManager {
     }
 
     /**
+     * Get total question count for dashboard
+     * @returns {number} Total number of questions
+     */
+    getTotalQuestionCount() {
+        return this.questions.size;
+    }
+
+    /**
      * Clear all questions
      */
     clearAllQuestions() {

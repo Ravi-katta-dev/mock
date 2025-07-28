@@ -356,6 +356,36 @@ class ResultsAnalyzer {
     }
 
     /**
+     * Get overall statistics for dashboard
+     * @returns {Object} Overall statistics
+     */
+    getOverallStats() {
+        const testHistory = this.analyticsData?.testHistory || [];
+        
+        if (testHistory.length === 0) {
+            return {
+                totalTests: 0,
+                averageScore: 0,
+                bestScore: 0,
+                totalQuestions: 0
+            };
+        }
+
+        const scores = testHistory.map(test => test.score || 0);
+        const totalTests = testHistory.length;
+        const averageScore = Math.round(scores.reduce((sum, score) => sum + score, 0) / totalTests);
+        const bestScore = Math.max(...scores);
+        const totalQuestions = testHistory.reduce((sum, test) => sum + (test.totalQuestions || 0), 0);
+
+        return {
+            totalTests,
+            averageScore,
+            bestScore,
+            totalQuestions
+        };
+    }
+
+    /**
      * Clear all analytics data
      */
     clearAnalytics() {
