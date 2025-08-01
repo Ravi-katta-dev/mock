@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" aria-labelledby="device-circuit-title" role="img">
+  <title id="device-circuit-title">Electronic Device and Circuit Icon</title>
+  <defs>
+    <linearGradient id="circuitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="componentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="45" fill="url(#circuitGradient)" stroke="#1e293b" stroke-width="2"/>
+  
+  <!-- Circuit board traces -->
+  <g stroke="#60a5fa" stroke-width="2" fill="none" opacity="0.8">
+    <path d="M15 35 L85 35"/>
+    <path d="M15 50 L85 50"/>
+    <path d="M15 65 L85 65"/>
+    <path d="M25 25 L25 75"/>
+    <path d="M40 25 L40 75"/>
+    <path d="M60 25 L60 75"/>
+    <path d="M75 25 L75 75"/>
+  </g>
+  
+  <!-- Connection nodes -->
+  <g fill="#93c5fd">
+    <circle cx="25" cy="35" r="2"/>
+    <circle cx="40" cy="35" r="2"/>
+    <circle cx="60" cy="35" r="2"/>
+    <circle cx="75" cy="35" r="2"/>
+    <circle cx="25" cy="50" r="2"/>
+    <circle cx="40" cy="50" r="2"/>
+    <circle cx="60" cy="50" r="2"/>
+    <circle cx="75" cy="50" r="2"/>
+    <circle cx="25" cy="65" r="2"/>
+    <circle cx="40" cy="65" r="2"/>
+    <circle cx="60" cy="65" r="2"/>
+    <circle cx="75" cy="65" r="2"/>
+  </g>
+  
+  <!-- Diode symbol -->
+  <g stroke="#ffffff" stroke-width="2.5" fill="url(#componentGradient)">
+    <path d="M30 42 L30 58 L38 50 Z"/>
+    <line x1="38" y1="42" x2="38" y2="58"/>
+  </g>
+  
+  <!-- Transistor symbol (NPN) -->
+  <g stroke="#ffffff" stroke-width="2.5" fill="none">
+    <circle cx="62" cy="50" r="8" fill="url(#componentGradient)"/>
+    <line x1="54" y1="45" x2="58" y2="48"/>
+    <line x1="54" y1="55" x2="58" y2="52"/>
+    <line x1="58" y1="48" x2="58" y2="52"/>
+    <line x1="66" y1="45" x2="62" y2="48"/>
+    <line x1="66" y1="55" x2="62" y2="52"/>
+    <!-- Arrow -->
+    <polygon points="64,52 66,50 66,54" fill="#ffffff"/>
+  </g>
+  
+  <!-- Op-amp symbol -->
+  <g stroke="#ffffff" stroke-width="2" fill="url(#componentGradient)">
+    <path d="M20 20 L35 27 L20 34 Z"/>
+    <line x1="15" y1="24" x2="20" y2="24"/>
+    <line x1="15" y1="30" x2="20" y2="30"/>
+    <line x1="35" y1="27" x2="40" y2="27"/>
+    <!-- + symbol -->
+    <g stroke="#ffffff" stroke-width="1" fill="none">
+      <line x1="17" y1="24" x2="19" y2="24"/>
+      <line x1="18" y1="23" x2="18" y2="25"/>
+    </g>
+    <!-- - symbol -->
+    <line x1="17" y1="30" x2="19" y2="30" stroke="#ffffff" stroke-width="1"/>
+  </g>
+  
+  <!-- Electronic components on the right -->
+  <g stroke="#ffffff" stroke-width="1.5" fill="none">
+    <!-- Resistor -->
+    <rect x="72" y="20" width="12" height="6" fill="url(#componentGradient)" rx="1"/>
+    <g stroke="#ffffff" stroke-width="1">
+      <line x1="73" y1="22" x2="75" y2="22"/>
+      <line x1="75" y1="22" x2="77" y2="24"/>
+      <line x1="77" y1="24" x2="79" y2="22"/>
+      <line x1="79" y1="22" x2="81" y2="24"/>
+      <line x1="81" y1="24" x2="83" y2="22"/>
+    </g>
+    
+    <!-- Capacitor -->
+    <g fill="url(#componentGradient)">
+      <line x1="72" y1="32" x2="72" y2="38" stroke="#ffffff" stroke-width="2"/>
+      <line x1="76" y1="32" x2="76" y2="38" stroke="#ffffff" stroke-width="2"/>
+    </g>
+  </g>
+  
+  <!-- Signal waves to show electronic activity -->
+  <g stroke="#34d399" stroke-width="1.5" fill="none" opacity="0.7">
+    <path d="M45 15 Q50 10 55 15 T65 15"/>
+    <path d="M35 85 Q40 80 45 85 T55 85"/>
+  </g>
+  
+  <!-- Text elements for accessibility -->
+  <text x="50" y="90" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#ffffff" opacity="0.8">
+    Electronic Devices
+  </text>
+</svg>

@@ -1,0 +1,101 @@
+{
+  "concepts": [
+    {
+      "id": "diodes",
+      "title": "Diodes",
+      "description": "Semiconductor devices that allow current flow in one direction only",
+      "detailedDescription": "A diode is a two-terminal electronic component that conducts current primarily in one direction (asymmetric conductance). It has low resistance in one direction and high resistance in the opposite direction. Diodes are fundamental building blocks in electronic circuits and are used for rectification, voltage regulation, and signal processing.",
+      "topics": [
+        "PN Junction principles",
+        "Forward and reverse bias",
+        "IV characteristics",
+        "Zener diodes"
+      ],
+      "examples": [
+        "Power supply rectification using bridge rectifiers",
+        "Signal demodulation in AM radio receivers",
+        "Voltage regulation using Zener diodes",
+        "Freewheeling diodes in motor control circuits"
+      ],
+      "formulas": [
+        "I = I₀(e^(qV/kT) - 1) - Shockley Diode Equation",
+        "V_f ≈ 0.7V for Silicon diodes",
+        "V_z = constant for Zener diodes in reverse breakdown"
+      ],
+      "keyPoints": [
+        "Forward bias: Anode positive relative to cathode",
+        "Reverse bias: Cathode positive relative to anode",
+        "Threshold voltage (V_f) must be exceeded for conduction",
+        "Reverse breakdown occurs at Zener voltage"
+      ]
+    },
+    {
+      "id": "transistors",
+      "title": "Transistors",
+      "description": "Three-terminal devices used for amplification and switching applications",
+      "detailedDescription": "Transistors are semiconductor devices with three terminals used to amplify or switch electronic signals and electrical power. They are composed of semiconductor material with at least three terminals for connection to an external circuit. The two main types are Bipolar Junction Transistors (BJT) and Field-Effect Transistors (FET).",
+      "topics": [
+        "BJT and FET types",
+        "Biasing techniques",
+        "Amplifier configurations",
+        "Switching applications"
+      ],
+      "examples": [
+        "Audio amplification in stereo systems",
+        "Digital switching in computer processors",
+        "Voltage amplification in operational amplifiers",
+        "Power control in motor drive circuits"
+      ],
+      "formulas": [
+        "I_C = β × I_B (BJT current relationship)",
+        "I_D = K(V_GS - V_TH)² (MOSFET saturation region)",
+        "A_v = -g_m × R_L (Common source amplifier gain)",
+        "g_m = 2√(K × I_D) (Transconductance)"
+      ],
+      "keyPoints": [
+        "BJT: Current controlled device (Base current controls Collector current)",
+        "FET: Voltage controlled device (Gate voltage controls Drain current)",
+        "Three configurations: Common Emitter, Common Base, Common Collector",
+        "Active, Cutoff, and Saturation regions of operation"
+      ]
+    },
+    {
+      "id": "opamps",
+      "title": "Operational Amplifiers",
+      "description": "High-gain differential amplifiers used in analog circuit applications",
+      "detailedDescription": "An operational amplifier (op-amp) is a DC-coupled high-gain electronic voltage amplifier with a differential input and usually a single-ended output. Op-amps are among the most widely used electronic devices today, being used in a vast array of consumer, industrial, and scientific devices.",
+      "topics": [
+        "Ideal op-amp characteristics",
+        "Inverting and non-inverting configurations",
+        "Feedback analysis",
+        "Practical applications"
+      ],
+      "examples": [
+        "Audio signal amplification and processing",
+        "Active filters for signal conditioning",
+        "Voltage regulators and references",
+        "Analog-to-digital converter circuits"
+      ],
+      "formulas": [
+        "A_ol = V_out / (V+ - V-) (Open loop gain)",
+        "A_v = 1 + (R_f/R_in) (Non-inverting amplifier)",
+        "A_v = -R_f/R_in (Inverting amplifier)",
+        "f_c = 1/(2πRC) (Active filter cutoff frequency)"
+      ],
+      "keyPoints": [
+        "Infinite input impedance (no input current)",
+        "Zero output impedance",
+        "Infinite open-loop gain",
+        "Zero offset voltage between inputs",
+        "Infinite bandwidth",
+        "Virtual short circuit between inputs in feedback"
+      ]
+    }
+  ],
+  "meta": {
+    "version": "1.0.0",
+    "lastUpdated": "2024-01-15",
+    "totalConcepts": 3,
+    "author": "RRB Electronics Team"
+  }
+}
