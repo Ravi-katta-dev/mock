@@ -1,0 +1,230 @@
+{
+  "exercises": [
+    {
+      "id": 1,
+      "topic": "diodes",
+      "difficulty": "easy",
+      "question": "What is the primary function of a diode in an electronic circuit?",
+      "options": [
+        "To amplify electrical signals",
+        "To allow current flow in one direction only",
+        "To store electrical energy",
+        "To generate alternating current"
+      ],
+      "correctAnswer": 1,
+      "explanation": "A diode's primary function is to allow current to flow in only one direction, from anode to cathode, making it useful for rectification and protection circuits."
+    },
+    {
+      "id": 2,
+      "topic": "diodes",
+      "difficulty": "medium",
+      "question": "In a Silicon diode, what is the approximate forward voltage drop when conducting?",
+      "options": [
+        "0.3V",
+        "0.7V",
+        "1.2V",
+        "2.1V"
+      ],
+      "correctAnswer": 1,
+      "explanation": "Silicon diodes have a forward voltage drop of approximately 0.7V when conducting. This is due to the energy barrier of the PN junction in silicon."
+    },
+    {
+      "id": 3,
+      "topic": "diodes",
+      "difficulty": "hard",
+      "question": "Which equation best describes the current-voltage relationship in a diode?",
+      "options": [
+        "I = V/R (Ohm's Law)",
+        "I = I₀(e^(qV/kT) - 1) (Shockley Equation)",
+        "I = C(dV/dt) (Capacitor Equation)",
+        "V = L(dI/dt) (Inductor Equation)"
+      ],
+      "correctAnswer": 1,
+      "explanation": "The Shockley diode equation I = I₀(e^(qV/kT) - 1) describes the exponential relationship between current and voltage in a diode, where I₀ is the reverse saturation current."
+    },
+    {
+      "id": 4,
+      "topic": "transistors",
+      "difficulty": "easy",
+      "question": "How many terminals does a typical transistor have?",
+      "options": [
+        "Two",
+        "Three",
+        "Four",
+        "Five"
+      ],
+      "correctAnswer": 1,
+      "explanation": "A typical transistor has three terminals: Base, Collector, and Emitter (for BJT) or Gate, Drain, and Source (for FET)."
+    },
+    {
+      "id": 5,
+      "topic": "transistors",
+      "difficulty": "medium",
+      "question": "In a BJT (Bipolar Junction Transistor), what controls the collector current?",
+      "options": [
+        "Collector voltage",
+        "Base current",
+        "Emitter voltage",
+        "Supply voltage"
+      ],
+      "correctAnswer": 1,
+      "explanation": "In a BJT, the base current controls the collector current. This relationship is described by the current gain β, where IC = β × IB."
+    },
+    {
+      "id": 6,
+      "topic": "transistors",
+      "difficulty": "hard",
+      "question": "What is the relationship between collector current (IC) and base current (IB) in a BJT?",
+      "options": [
+        "IC = IB",
+        "IC = β × IB",
+        "IC = IB/β",
+        "IC = IB²"
+      ],
+      "correctAnswer": 1,
+      "explanation": "The collector current is related to base current by the current gain factor β (beta), where IC = β × IB. Typical β values range from 50 to 300."
+    },
+    {
+      "id": 7,
+      "topic": "opamps",
+      "difficulty": "easy",
+      "question": "What does 'op-amp' stand for?",
+      "options": [
+        "Operational Amplifier",
+        "Optical Amplifier",
+        "Optimized Amplifier",
+        "Output Amplifier"
+      ],
+      "correctAnswer": 0,
+      "explanation": "Op-amp stands for Operational Amplifier, a high-gain differential amplifier widely used in analog circuits."
+    },
+    {
+      "id": 8,
+      "topic": "opamps",
+      "difficulty": "medium",
+      "question": "In an ideal op-amp, what is the input impedance?",
+      "options": [
+        "Zero",
+        "Very low",
+        "Moderate",
+        "Infinite"
+      ],
+      "correctAnswer": 3,
+      "explanation": "An ideal op-amp has infinite input impedance, meaning no current flows into the input terminals. This allows the op-amp to not load the source circuit."
+    },
+    {
+      "id": 9,
+      "topic": "opamps",
+      "difficulty": "hard",
+      "question": "For a non-inverting op-amp amplifier with feedback resistor Rf and input resistor Rin, what is the voltage gain?",
+      "options": [
+        "Av = -Rf/Rin",
+        "Av = Rf/Rin",
+        "Av = 1 + Rf/Rin",
+        "Av = Rf - Rin"
+      ],
+      "correctAnswer": 2,
+      "explanation": "For a non-inverting op-amp amplifier, the voltage gain is Av = 1 + Rf/Rin, where Rf is the feedback resistor and Rin is the input resistor."
+    },
+    {
+      "id": 10,
+      "topic": "diodes",
+      "difficulty": "medium",
+      "question": "What type of diode is specifically designed to operate in the reverse breakdown region?",
+      "options": [
+        "Schottky diode",
+        "Zener diode",
+        "Light-emitting diode (LED)",
+        "Varactor diode"
+      ],
+      "correctAnswer": 1,
+      "explanation": "Zener diodes are designed to operate in the reverse breakdown region to provide voltage regulation. They maintain a constant voltage across their terminals when reverse biased beyond the Zener voltage."
+    },
+    {
+      "id": 11,
+      "topic": "transistors",
+      "difficulty": "easy",
+      "question": "Which type of transistor is voltage-controlled?",
+      "options": [
+        "BJT (Bipolar Junction Transistor)",
+        "FET (Field-Effect Transistor)",
+        "Both BJT and FET",
+        "Neither BJT nor FET"
+      ],
+      "correctAnswer": 1,
+      "explanation": "FET (Field-Effect Transistor) is voltage-controlled, where the gate voltage controls the drain current. BJT is current-controlled, where base current controls collector current."
+    },
+    {
+      "id": 12,
+      "topic": "opamps",
+      "difficulty": "medium",
+      "question": "What is the key principle that allows op-amp circuits to work with negative feedback?",
+      "options": [
+        "High output impedance",
+        "Virtual short circuit between inputs",
+        "Low input impedance",
+        "Limited bandwidth"
+      ],
+      "correctAnswer": 1,
+      "explanation": "The virtual short circuit principle states that with negative feedback, the op-amp will adjust its output to make the voltage difference between its inputs essentially zero."
+    },
+    {
+      "id": 13,
+      "topic": "diodes",
+      "difficulty": "hard",
+      "question": "In a full-wave bridge rectifier circuit, how many diodes are used?",
+      "options": [
+        "Two",
+        "Three",
+        "Four",
+        "Six"
+      ],
+      "correctAnswer": 2,
+      "explanation": "A full-wave bridge rectifier uses four diodes arranged in a bridge configuration to rectify both halves of the AC input waveform without requiring a center-tapped transformer."
+    },
+    {
+      "id": 14,
+      "topic": "transistors",
+      "difficulty": "hard",
+      "question": "What is the main advantage of a MOSFET over a BJT in switching applications?",
+      "options": [
+        "Higher current capacity",
+        "Lower cost",
+        "Faster switching speed and lower power consumption",
+        "Better linearity"
+      ],
+      "correctAnswer": 2,
+      "explanation": "MOSFETs have faster switching speeds and consume less power because they are voltage-controlled devices with very high input impedance, requiring minimal drive current."
+    },
+    {
+      "id": 15,
+      "topic": "opamps",
+      "difficulty": "hard",
+      "question": "In an op-amp integrator circuit, what component is connected in the feedback path?",
+      "options": [
+        "Resistor",
+        "Inductor",
+        "Capacitor",
+        "Diode"
+      ],
+      "correctAnswer": 2,
+      "explanation": "In an op-amp integrator circuit, a capacitor is connected in the feedback path. This creates a circuit that produces an output voltage proportional to the integral of the input voltage over time."
+    }
+  ],
+  "meta": {
+    "version": "1.0.0",
+    "lastUpdated": "2024-01-15",
+    "totalExercises": 15,
+    "difficultyDistribution": {
+      "easy": 5,
+      "medium": 5,
+      "hard": 5
+    },
+    "topicDistribution": {
+      "diodes": 5,
+      "transistors": 5,
+      "opamps": 5
+    },
+    "author": "RRB Electronics Team"
+  }
+}
